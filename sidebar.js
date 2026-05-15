@@ -74,70 +74,77 @@ function escapeHtml(text) {
   return d.innerHTML;
 }
 
-function codeRenderer({ text, lang }) {
-  const langName = languageNames[lang] || lang || 'Text';
-  const hasLines = text.includes('\n');
-  const lines = text.split('\n');
-  const codeHtml = lines.map((line, i) => {
-    const num = hasLines ? `<span class="ln">${i + 1}</span>` : '';
-    const content = escapeHtml(line || ' ');
-    return `<span class="cl">${num}<span class="cc">${content}</span></span>`;
-  }).join('');
+function enhanceCodeBlocks(html) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html;
 
-  return `<div class="cb-wrap">
-    <div class="cb-header">
-      <span class="cb-lang">${langName}</span>
-      <button class="cb-copy" data-cb="${escapeHtml(text)}">Copy</button>
-    </div>
-    <pre><code>${codeHtml}</code></pre>
-  </div>`;
+  wrapper.querySelectorAll('pre > code').forEach(codeEl => {
+    const pre = codeEl.parentElement;
+    if (pre.closest('.cb-wrap')) return;
+
+    const text = codeEl.textContent;
+    const classMatch = codeEl.className.match(/language-(\w+)/);
+    const lang = classMatch ? classMatch[1] : '';
+    const langName = languageNames[lang] || lang || 'Text';
+    const hasLines = text.includes('\n');
+    const lines = text.split('\n');
+
+    const codeHtml = lines.map((line, i) => {
+      const num = hasLines ? `<span class="ln">${i + 1}</span>` : '';
+      const content = escapeHtml(line || ' ');
+      return `<span class="cl">${num}<span class="cc">${content}</span></span>`;
+    }).join('');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'cb-wrap';
+    wrap.innerHTML = `
+      <div class="cb-header">
+        <span class="cb-lang">${langName}</span>
+        <button class="cb-copy">Copy</button>
+      </div>
+      <pre><code>${codeHtml}</code></pre>
+    `;
+
+    pre.replaceWith(wrap);
+  });
+
+  return wrapper.innerHTML;
 }
-
-let lastRenderedId = 0;
 
 function renderMarkdown(text) {
   if (!text) return '';
-  lastRenderedId++;
-  const id = lastRenderedId;
+  try {
+    const raw = marked.parse(text);
+    const safe = raw
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+      .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+      .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+      .replace(/\son\w+="[^"]*"/gi, '')
+      .replace(/\son\w+='[^']*'/gi, '');
 
-  const raw = marked.parse(text, {
-    renderer: { code: codeRenderer }
-  });
-
-  const safe = raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '');
-
-  setTimeout(() => attachCodeCopyHandlers(id), 0);
-  return safe;
+    return enhanceCodeBlocks(safe);
+  } catch {
+    return `<p>${escapeHtml(text)}</p>`;
+  }
 }
 
-function attachCodeCopyHandlers(id) {
-  document.querySelectorAll('.cb-wrap .cb-copy').forEach(btn => {
-    if (btn.dataset.handled) return;
-    btn.dataset.handled = '1';
-    btn.addEventListener('click', async () => {
-      const code = btn.dataset.cb;
-      if (!code) return;
-      try {
-        await navigator.clipboard.writeText(code);
-        btn.textContent = 'Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => {
-          btn.textContent = 'Copy';
-          btn.classList.remove('copied');
-        }, 2000);
-      } catch {
-        btn.textContent = 'Failed';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-      }
-    });
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.cb-copy');
+  if (!btn) return;
+  const wrap = btn.closest('.cb-wrap');
+  if (!wrap) return;
+  const code = wrap.querySelector('code')?.textContent;
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  }).catch(() => {
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
   });
-}
+});
 
 async function init() {
   await loadHistory();
