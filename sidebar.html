@@ -10,7 +10,7 @@
     body { display: flex; flex-direction: column; }
 
     .app-header {
-      padding: 14px 16px 10px;
+      padding: 12px 14px 10px;
       flex-shrink: 0;
       background: rgba(10, 10, 20, 0.6);
       backdrop-filter: blur(20px);
@@ -33,24 +33,32 @@
     .app-header .brand h2 {
       font-size: 15px; font-weight: 600;
     }
-    .app-header .brand .version {
-      font-size: 10px; color: var(--text-muted); margin-left: 2px; font-family: var(--font-body);
+    .header-actions { display: flex; gap: 2px; }
+
+    .header-actions button {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; color: var(--text-secondary);
+      cursor: pointer; transition: all 0.15s;
     }
-    .header-actions { display: flex; gap: 4px; }
+    .header-actions button:hover { background: var(--surface-hover); color: var(--text); }
+    .header-actions button.active { background: var(--accent-glow); color: var(--accent); }
 
     .model-bar {
-      display: flex; gap: 6px; margin-top: 10px;
+      display: flex; gap: 6px; margin-top: 8px;
     }
-    .model-bar select { flex: 1; font-size: 11px; padding: 6px 28px 6px 10px; }
+    .model-bar select { flex: 1; font-size: 11px; padding: 5px 26px 5px 8px; }
     .model-bar select option { font-size: 12px; }
+
+    .main-area {
+      flex: 1; display: flex; overflow: hidden; position: relative;
+    }
 
     .chat-area {
       flex: 1; overflow-y: auto; padding: 8px 12px 4px;
       scroll-behavior: smooth;
     }
-    .chat-area:empty {
-      display: flex; align-items: center; justify-content: center;
-    }
+    .chat-area:empty { display: flex; align-items: center; justify-content: center; }
 
     .msg-group {
       margin-bottom: 10px;
@@ -60,37 +68,24 @@
     .msg-group.ai { display: flex; flex-direction: column; align-items: flex-start; }
 
     .msg-bubble {
-      padding: 10px 14px;
-      font-size: 13px;
-      line-height: 1.6;
-      max-width: 88%;
-      word-wrap: break-word;
-      position: relative;
-      transition: all 0.2s ease;
+      padding: 10px 14px; font-size: 13px; line-height: 1.6;
+      max-width: 88%; word-wrap: break-word; position: relative;
     }
     .msg-group.user .msg-bubble {
       background: linear-gradient(135deg, var(--accent), #d97706);
-      color: #0a0a14;
-      border-radius: 14px 14px 4px 14px;
+      color: #0a0a14; border-radius: 14px 14px 4px 14px;
       font-weight: 500;
       box-shadow: 0 2px 8px var(--accent-glow);
     }
     .msg-group.ai .msg-bubble {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: var(--surface); border: 1px solid var(--border);
       border-radius: 14px 14px 14px 4px;
-      color: var(--text);
     }
 
     .msg-meta {
-      font-size: 10px;
-      color: var(--text-muted);
-      padding: 0 6px;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 500;
+      font-size: 10px; color: var(--text-muted);
+      padding: 0 6px; margin-bottom: 4px;
+      display: flex; align-items: center; gap: 6px; font-weight: 500;
       letter-spacing: 0.02em;
     }
     .msg-group.user .msg-meta { justify-content: flex-end; }
@@ -100,30 +95,25 @@
       opacity: 0; transition: opacity 0.2s;
     }
     .msg-group:hover .msg-actions { opacity: 1; }
-
     .msg-actions button {
       background: none; border: none; color: var(--text-muted);
       padding: 3px; cursor: pointer; border-radius: 4px;
-      display: inline-flex; align-items: center; transition: all 0.15s;
+      display: inline-flex; align-items: center;
     }
     .msg-actions button:hover { background: var(--surface-hover); color: var(--text-secondary); }
 
     .msg-bubble pre {
-      background: rgba(0,0,0,0.3);
-      padding: 10px; border-radius: 8px;
-      overflow-x: auto; margin: 6px 0;
-      font-size: 12px;
+      background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;
+      overflow-x: auto; margin: 6px 0; font-size: 12px;
     }
     .msg-bubble code {
-      background: rgba(0,0,0,0.3);
-      padding: 1px 5px; border-radius: 4px;
-      font-size: 12px;
+      background: rgba(0,0,0,0.3); padding: 1px 5px; border-radius: 4px; font-size: 12px;
     }
     .msg-bubble pre code { background: none; padding: 0; }
 
+    /* Input */
     .input-area {
-      padding: 10px 12px 12px;
-      flex-shrink: 0;
+      padding: 8px 12px 10px; flex-shrink: 0;
       background: rgba(10, 10, 20, 0.4);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -143,17 +133,10 @@
       background: var(--surface-hover);
     }
     .input-wrap textarea {
-      flex: 1;
-      padding: 7px 10px;
-      background: none;
-      border: none;
-      color: var(--text);
-      font-size: 13px;
-      resize: none;
-      min-height: 22px;
-      max-height: 100px;
-      outline: none;
-      line-height: 1.5;
+      flex: 1; padding: 7px 10px; background: none;
+      border: none; color: var(--text); font-size: 13px;
+      resize: none; min-height: 22px; max-height: 100px;
+      outline: none; line-height: 1.5;
     }
     .input-wrap textarea::placeholder { color: var(--text-muted); }
     .input-wrap .send-btn {
@@ -173,11 +156,6 @@
       margin-top: 6px; padding: 0 4px;
     }
     .input-footer .hint { font-size: 11px; color: var(--text-muted); }
-    .input-footer .clear-btn {
-      font-size: 11px; color: var(--text-muted); background: none; border: none;
-      cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.15s;
-    }
-    .input-footer .clear-btn:hover { color: var(--danger); background: var(--danger-bg); }
 
     .typing-indicator {
       display: flex; gap: 4px; align-items: center; padding: 6px 0;
@@ -195,23 +173,125 @@
     }
 
     .error-msg {
-      margin: 8px 0;
-      padding: 10px 14px;
+      margin: 8px 0; padding: 10px 14px;
       border-radius: var(--radius-md);
       background: var(--danger-bg);
       border: 1px solid rgba(239, 68, 68, 0.2);
-      font-size: 12px;
-      color: var(--danger);
+      font-size: 12px; color: var(--danger);
       animation: scaleIn 0.2s ease;
     }
     .error-msg .retry-btn {
       margin-top: 8px;
       background: rgba(239, 68, 68, 0.15);
-      color: var(--danger);
-      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);
     }
-    .error-msg .retry-btn:hover {
-      background: rgba(239, 68, 68, 0.25);
+    .error-msg .retry-btn:hover { background: rgba(239, 68, 68, 0.25); }
+
+    /* History panel */
+    .history-overlay {
+      position: absolute; inset: 0; z-index: 10;
+      background: rgba(0,0,0,0.5);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .history-overlay.open {
+      opacity: 1; pointer-events: auto;
+    }
+
+    .history-panel {
+      position: absolute; inset: 0; z-index: 20;
+      background: var(--bg);
+      background-image: var(--bg-gradient);
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex; flex-direction: column;
+    }
+    .history-panel.open {
+      transform: translateX(0);
+    }
+
+    .history-header {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .history-header h3 {
+      font-size: 15px; font-weight: 600;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .history-close {
+      width: 30px; height: 30px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; color: var(--text-secondary);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .history-close:hover { background: var(--surface-hover); color: var(--text); }
+
+    .history-list {
+      flex: 1; overflow-y: auto; padding: 8px;
+    }
+    .history-date-heading {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-muted);
+      padding: 12px 8px 6px;
+      font-family: var(--font-heading);
+    }
+
+    .history-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; border-radius: var(--radius-md);
+      cursor: pointer; transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+    .history-item:hover {
+      background: var(--surface-hover);
+      border-color: var(--border);
+    }
+    .history-item.active {
+      background: var(--accent-glow);
+      border-color: var(--border-accent);
+    }
+    .history-item .h-item-icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: var(--text-muted);
+    }
+    .history-item .h-item-info { flex: 1; min-width: 0; }
+    .history-item .h-item-title {
+      font-size: 13px; font-weight: 500; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .history-item .h-item-meta {
+      font-size: 11px; color: var(--text-muted); margin-top: 2px;
+    }
+    .history-item .h-item-delete {
+      width: 24px; height: 24px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; opacity: 0; transition: all 0.15s;
+    }
+    .history-item:hover .h-item-delete { opacity: 1; }
+    .history-item .h-item-delete:hover { color: var(--danger); background: var(--danger-bg); }
+
+    .history-new-btn {
+      margin: 8px; padding: 10px; border-radius: var(--radius-md);
+      background: var(--surface); border: 1px dashed var(--border-light);
+      color: var(--text-secondary); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; font-size: 13px; transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .history-new-btn:hover {
+      background: var(--surface-hover); border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .history-panel, .history-overlay {
+        transition: none;
+      }
     }
   </style>
 </head>
@@ -220,16 +300,17 @@
     <div class="top">
       <div class="brand">
         <div class="brand-icon">AI</div>
-        <div>
-          <h2>AI Sidebar</h2>
-        </div>
+        <h2>AI Sidebar</h2>
       </div>
       <div class="header-actions">
-        <button class="btn-ghost" id="settingsBtn" title="Settings">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
-          </svg>
+        <button id="newChatBtn" title="New Chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="historyToggle" title="Chat History">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </button>
+        <button id="settingsBtn" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
         </button>
       </div>
     </div>
@@ -243,21 +324,38 @@
     </div>
   </div>
 
-  <div class="chat-area" id="chatArea"></div>
+  <div class="main-area">
+    <div class="chat-area" id="chatArea"></div>
+
+    <div class="history-overlay" id="historyOverlay"></div>
+
+    <div class="history-panel" id="historyPanel">
+      <div class="history-header">
+        <h3>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          History
+        </h3>
+        <button class="history-close" id="historyClose">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="history-list" id="historyList"></div>
+      <button class="history-new-btn" id="historyNewBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        New Chat
+      </button>
+    </div>
+  </div>
 
   <div class="input-area">
     <div class="input-wrap">
       <textarea id="messageInput" placeholder="Ask anything..." rows="1"></textarea>
-      <button class="send-btn" id="sendBtn" title="Send">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
+      <button class="send-btn" id="sendBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
       </button>
     </div>
     <div class="input-footer">
-      <span class="hint">Ctrl+Enter</span>
-      <button class="clear-btn" id="clearBtn">Clear</button>
+      <span class="hint">Enter to send</span>
     </div>
   </div>
 
