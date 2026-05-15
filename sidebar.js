@@ -74,6 +74,106 @@ function escapeHtml(text) {
   return d.innerHTML;
 }
 
+const keywordSets = {
+  js: ['async','await','break','case','catch','class','const','continue','debugger','default','delete','do','else','enum','export','extends','false','finally','for','function','if','import','in','instanceof','let','new','null','of','return','static','super','switch','this','throw','true','try','typeof','var','void','while','with','yield','from','as'],
+  ts: ['async','await','break','case','catch','class','const','continue','debugger','default','delete','do','else','enum','export','extends','false','finally','for','function','if','implements','import','in','instanceof','interface','let','new','null','of','package','private','protected','public','return','static','super','switch','this','throw','true','try','type','typeof','var','void','while','with','yield','from','as','readonly','abstract','declare','namespace','module','keyof','infer','satisfies'],
+  py: ['False','None','True','and','as','assert','async','await','break','class','continue','def','del','elif','else','except','finally','for','from','global','if','import','in','is','lambda','nonlocal','not','or','pass','raise','return','try','while','with','yield','self','print'],
+  rs: ['as','break','const','continue','crate','else','enum','extern','false','fn','for','if','impl','in','let','loop','match','mod','move','mut','pub','ref','return','self','Self','static','struct','super','trait','true','type','unsafe','use','where','while','async','await','dyn'],
+  go: ['break','case','chan','const','continue','default','defer','else','fallthrough','for','func','go','goto','if','import','interface','map','package','range','return','select','struct','switch','type','var'],
+  java: ['abstract','assert','boolean','break','byte','case','catch','char','class','const','continue','default','do','double','else','enum','extends','false','final','finally','float','for','goto','if','implements','import','instanceof','int','interface','long','native','new','null','package','private','protected','public','return','short','static','strictfp','super','switch','synchronized','this','throw','throws','transient','true','try','void','volatile','while'],
+  swift: ['associatedtype','class','deinit','enum','extension','fileprivate','func','import','init','inout','internal','let','open','operator','private','protocol','public','rethrows','static','struct','subscript','typealias','var','break','case','continue','default','defer','do','else','fallthrough','for','guard','if','in','repeat','return','switch','where','while','as','catch','false','is','nil','super','self','Self','throw','throws','true','try'],
+  sh: ['if','then','else','elif','fi','for','while','do','done','case','esac','in','function','select','until','declare','local','export','readonly','return','exit','echo','printf','source','set','unset','trap','exec','eval'],
+  sql: ['SELECT','FROM','WHERE','INSERT','INTO','VALUES','UPDATE','SET','DELETE','CREATE','TABLE','ALTER','DROP','INDEX','VIEW','JOIN','INNER','LEFT','RIGHT','OUTER','ON','AND','OR','NOT','IN','LIKE','BETWEEN','IS','NULL','AS','ORDER','BY','GROUP','HAVING','DISTINCT','COUNT','SUM','AVG','MIN','MAX','EXISTS','UNION','ALL','CASE','WHEN','THEN','ELSE','END','LIMIT','OFFSET','FOREIGN','KEY','PRIMARY','REFERENCES','CASCADE','INT','VARCHAR','TEXT','BOOLEAN','DATE','FLOAT','DOUBLE','PRECISION','NUMBER','SERIAL'],
+};
+
+function getKeywords(lang) {
+  return keywordSets[lang] || keywordSets.js;
+}
+
+function highlightCode(text, lang) {
+  const keywords = new Set(getKeywords(lang));
+  const tokens = [];
+  let i = 0;
+
+  while (i < text.length) {
+    const remaining = text.slice(i);
+
+    const commentMatch = remaining.match(/^\/\/[^\n]*/);
+    if (commentMatch) { tokens.push({ t: 'c', v: commentMatch[0] }); i += commentMatch[0].length; continue; }
+
+    const blockCommentMatch = remaining.match(/^\/\*[\s\S]*?\*\//);
+    if (blockCommentMatch) { tokens.push({ t: 'c', v: blockCommentMatch[0] }); i += blockCommentMatch[0].length; continue; }
+
+    if (lang === 'py' || lang === 'python' || lang === 'sh' || lang === 'bash' || lang === 'shell' || lang === 'yaml' || lang === 'yml') {
+      const pyCommentMatch = remaining.match(/^#[^\n]*/);
+      if (pyCommentMatch) { tokens.push({ t: 'c', v: pyCommentMatch[0] }); i += pyCommentMatch[0].length; continue; }
+    }
+
+    const htmlCommentMatch = remaining.match(/^<!--[\s\S]*?-->/);
+    if (htmlCommentMatch) { tokens.push({ t: 'c', v: htmlCommentMatch[0] }); i += htmlCommentMatch[0].length; continue; }
+
+    const dqMatch = remaining.match(/^"(?:[^"\\]|\\.)*"/);
+    if (dqMatch) { tokens.push({ t: 's', v: dqMatch[0] }); i += dqMatch[0].length; continue; }
+
+    const sqMatch = remaining.match(/^'(?:[^'\\]|\\.)*'/);
+    if (sqMatch) { tokens.push({ t: 's', v: sqMatch[0] }); i += sqMatch[0].length; continue; }
+
+    const btMatch = remaining.match(/^`(?:[^`\\]|\\.)*`/);
+    if (btMatch) { tokens.push({ t: 's', v: btMatch[0] }); i += btMatch[0].length; continue; }
+
+    const numMatch = remaining.match(/^\b(?:0x[0-9a-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?)\b/);
+    if (numMatch) { tokens.push({ t: 'n', v: numMatch[0] }); i += numMatch[0].length; continue; }
+
+    const funcMatch = remaining.match(/^([a-zA-Z_$][\w$]*)\s*\(/);
+    if (funcMatch && !keywords.has(funcMatch[1])) {
+      tokens.push({ t: 'f', v: funcMatch[1] }); i += funcMatch[1].length; continue;
+    }
+
+    const cssPropMatch = remaining.match(/^([a-zA-Z-]+)\s*:/);
+    if ((lang === 'css' || lang === 'scss' || lang === 'sass' || lang === 'less') && cssPropMatch) {
+      tokens.push({ t: 'k', v: cssPropMatch[1] }); i += cssPropMatch[1].length; continue;
+    }
+
+    const wordMatch = remaining.match(/^[a-zA-Z_$][\w$]*/);
+    if (wordMatch) {
+      const word = wordMatch[0];
+      if (keywords.has(word)) {
+        if (word === 'true' || word === 'false' || word === 'null' || word === 'undefined' || word === 'None' || word === 'True' || word === 'False') {
+          tokens.push({ t: 'l', v: word });
+        } else if (word[0] === word[0].toUpperCase() && word !== word.toLowerCase()) {
+          tokens.push({ t: 't', v: word });
+        } else {
+          tokens.push({ t: 'k', v: word });
+        }
+      } else if (word[0] === word[0].toUpperCase() && word.length > 1) {
+        tokens.push({ t: 't', v: word });
+      } else {
+        tokens.push({ t: '', v: word });
+      }
+      i += word.length;
+      continue;
+    }
+
+    const cssValMatch = remaining.match(/^(#[0-9a-fA-F]{3,6}|[.\d]+(?:px|em|rem|%|vh|vw|s|ms))/);
+    if ((lang === 'css' || lang === 'scss' || lang === 'sass' || lang === 'less') && cssValMatch) {
+      tokens.push({ t: 'l', v: cssValMatch[0] }); i += cssValMatch[0].length; continue;
+    }
+
+    const opMatch = remaining.match(/^(=>|===|!==|<=|>=|==|!=|&&|\|\|[:?]?|[+\-*/%&|^~<>!=?:;,.{}()\[\]@#])/);
+    if (opMatch) { tokens.push({ t: 'o', v: opMatch[0] }); i += opMatch[0].length; continue; }
+
+    tokens.push({ t: '', v: remaining[0] });
+    i++;
+  }
+
+  return tokens.map(t => {
+    const v = escapeHtml(t.v);
+    if (!t.t) return v;
+    const cls = ({ c: 'c', s: 's', n: 'n', f: 'f', k: 'k', t: 't', o: 'o', l: 'l' })[t.t] || '';
+    return `<span class="hl-${cls}">${v}</span>`;
+  }).join('');
+}
+
 function enhanceCodeBlocks(html) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = html;
@@ -89,10 +189,11 @@ function enhanceCodeBlocks(html) {
     const hasLines = text.includes('\n');
     const lines = text.split('\n');
 
-    const codeHtml = lines.map((line, i) => {
+    const highlighted = highlightCode(text, lang);
+    const highlightedLines = highlighted.split('\n');
+    const codeHtml = highlightedLines.map((line, i) => {
       const num = hasLines ? `<span class="ln">${i + 1}</span>` : '';
-      const content = escapeHtml(line || ' ');
-      return `<span class="cl">${num}<span class="cc">${content}</span></span>`;
+      return `<span class="cl">${num}<span class="cc">${line || ' '}</span></span>`;
     }).join('');
 
     const wrap = document.createElement('div');
