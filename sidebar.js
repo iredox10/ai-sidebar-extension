@@ -38,6 +38,8 @@ let activeChatId = null;
 let chatHistory = [];
 let isProcessing = false;
 let historyOpen = false;
+let lastSentText = '';
+let ready = false;
 
 async function init() {
   await loadHistory();
@@ -78,7 +80,8 @@ async function init() {
 
   const chat = getActiveChat();
   messages = chat ? [...chat.messages] : [];
-  if (messages.length) renderMessages();
+  updateModelBar();
+  if (messages.length) { scrollInstant = true; renderMessages(); }
 
   autoResizeInput();
 
@@ -92,6 +95,22 @@ async function init() {
   }
 
   if (!messages.length) showEmptyState();
+  ready = true;
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.selectedText && ready) {
+      const text = changes.selectedText.newValue;
+      if (text) {
+        chrome.storage.local.remove('selectedText');
+        if (historyOpen) closeHistory();
+        messages.push({ role: 'user', content: `About this text: "${text}"` });
+        saveCurrentChat();
+        renderMessages();
+        scrollToBottom();
+        removeEmptyState();
+      }
+    }
+  });
 }
 
 // ---- Storage / Data ----
@@ -101,7 +120,7 @@ function generateId() {
 }
 
 function getActiveChat() {
-  return chatHistory.find(c => c.id === activeChatId) || chatHistory[0];
+  return chatHistory.find(c => c.id === activeChatId) || chatHistory[0] || null;
 }
 
 async function loadHistory() {
@@ -157,47 +176,61 @@ async function saveCurrentChat() {
   saveHistory();
 }
 
-function switchToChat(chatId) {
+async function switchToChat(chatId) {
   if (isProcessing) return;
-  saveCurrentChat();
+  await saveCurrentChat();
   activeChatId = chatId;
-  chrome.storage.local.set({ active_chat_id: chatId });
+  await chrome.storage.local.set({ active_chat_id: chatId });
   const chat = getActiveChat();
   messages = chat ? [...chat.messages] : [];
+  updateModelBar();
+  scrollInstant = true;
   renderMessages();
   scrollToBottom();
   if (!messages.length) showEmptyState();
   closeHistory();
+  messageInput.focus();
 }
 
 async function deleteChat(chatId) {
+  const chat = chatHistory.find(c => c.id === chatId);
+  if (!chat) return;
+  const msgCount = chat.messages.length;
+  const label = msgCount > 0 ? `"${chat.title}" (${msgCount} messages)` : 'this conversation';
+  if (!confirm(`Delete ${label}?`)) return;
+
   const idx = chatHistory.findIndex(c => c.id === chatId);
-  if (idx === -1) return;
   chatHistory.splice(idx, 1);
   await saveHistory();
+  renderHistoryList();
 
   if (activeChatId === chatId) {
     if (chatHistory.length > 0) {
-      switchToChat(chatHistory[0].id);
+      await switchToChat(chatHistory[0].id);
     } else {
       createNewChat();
       messages = [];
+      await chrome.storage.local.set({ active_chat_id: activeChatId });
       renderMessages();
       showEmptyState();
       closeHistory();
+      updateModelBar();
     }
   }
-  renderHistoryList();
 }
 
 async function newChat() {
   if (isProcessing) return;
-  saveCurrentChat();
+  if (getActiveChat() && messages.length > 0) {
+    await saveCurrentChat();
+  }
   createNewChat();
   messages = [];
+  await chrome.storage.local.set({ active_chat_id: activeChatId });
   renderMessages();
   showEmptyState();
   updateModelBar();
+  messageInput.focus();
 }
 
 function updateModelBar() {
@@ -382,9 +415,12 @@ function escapeHtml(text) {
   return d.innerHTML;
 }
 
+let scrollInstant = false;
+
 function scrollToBottom() {
   requestAnimationFrame(() => {
-    chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' });
+    chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: scrollInstant ? 'auto' : 'smooth' });
+    scrollInstant = false;
   });
 }
 
@@ -423,7 +459,13 @@ function showError(errorMsg) {
   const div = document.createElement('div');
   div.className = 'error-msg';
   div.innerHTML = `<div>${escapeHtml(errorMsg)}</div><button class="btn btn-xs retry-btn">Retry</button>`;
-  div.querySelector('.retry-btn').addEventListener('click', () => { div.remove(); sendMessage(); });
+  div.querySelector('.retry-btn').addEventListener('click', () => {
+    div.remove();
+    if (lastSentText && !messageInput.value.trim()) {
+      messageInput.value = lastSentText;
+    }
+    sendMessage();
+  });
   chatArea.appendChild(div);
   scrollToBottom();
 }
@@ -432,6 +474,9 @@ async function sendMessage() {
   const text = messageInput.value.trim();
   if (!text || isProcessing) return;
 
+  if (historyOpen) closeHistory();
+
+  lastSentText = text;
   messageInput.value = '';
   messageInput.style.height = 'auto';
 
