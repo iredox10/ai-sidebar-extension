@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Sidebar</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .status-dot.configured {
+      background: var(--success);
+    }
+    .status-dot.not-configured {
+      background: var(--danger);
+    }
+    .provider-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .actions button {
+      width: 100%;
+      justify-content: center;
+      padding: 10px;
+    }
+    .footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+    .footer a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 12px;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="width:32px;height:32px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:16px;">AI</div>
+    <div>
+      <h1>AI Sidebar</h1>
+      <div class="flex items-center gap-2" style="margin-top:2px;">
+        <span class="status-dot not-configured" id="statusDot"></span>
+        <span style="font-size:12px;color:var(--text-secondary)" id="statusText">Not configured</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="flex items-center justify-between">
+      <span class="label" style="margin:0;">Active Provider</span>
+      <span class="provider-tag" id="activeProvider">None</span>
+    </div>
+    <div class="flex items-center justify-between mt-2">
+      <span class="label" style="margin:0;">Model</span>
+      <span class="provider-tag" id="activeModel">—</span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="openSidebar">Open Sidebar</button>
+    <button class="btn btn-secondary" id="openSettings">Settings</button>
+  </div>
+
+  <div class="footer">
+    <a href="#" id="askSelected">Ask about selected text</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
