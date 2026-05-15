@@ -41,6 +41,11 @@ let historyOpen = false;
 let lastSentText = '';
 let ready = false;
 
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
+
 async function init() {
   await loadHistory();
   await loadOrCreateActiveChat();
@@ -369,7 +374,7 @@ function appendMessage(role, content) {
 
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
-  bubble.innerHTML = formatContent(escapeHtml(content));
+  bubble.innerHTML = renderMarkdown(content);
 
   div.appendChild(meta);
   div.appendChild(bubble);
@@ -400,13 +405,19 @@ function renderMessages() {
   });
 }
 
-function formatContent(text) {
-  return text
-    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-      return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
-    })
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br>');
+function renderMarkdown(text) {
+  if (!text) return '';
+  const raw = marked.parse(text);
+
+  const sanitized = raw
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '');
+
+  return sanitized;
 }
 
 function escapeHtml(text) {
