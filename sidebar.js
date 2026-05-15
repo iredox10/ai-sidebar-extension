@@ -41,10 +41,103 @@ let historyOpen = false;
 let lastSentText = '';
 let ready = false;
 
+const languageNames = {
+  js: 'JavaScript', javascript: 'JavaScript', jsx: 'JSX',
+  ts: 'TypeScript', typescript: 'TypeScript', tsx: 'TSX',
+  py: 'Python', python: 'Python',
+  rb: 'Ruby', ruby: 'Ruby',
+  rs: 'Rust', rust: 'Rust',
+  go: 'Go', java: 'Java',
+  kt: 'Kotlin', kotlin: 'Kotlin',
+  swift: 'Swift',
+  c: 'C', cpp: 'C++', csharp: 'C#',
+  php: 'PHP',
+  sql: 'SQL',
+  sh: 'Shell', bash: 'Bash', shell: 'Shell', zsh: 'Zsh',
+  json: 'JSON', xml: 'XML', html: 'HTML', css: 'CSS',
+  scss: 'SCSS', sass: 'Sass', less: 'Less',
+  yaml: 'YAML', yml: 'YAML',
+  md: 'Markdown', markdown: 'Markdown',
+  diff: 'Diff', dockerfile: 'Dockerfile', makefile: 'Makefile',
+  graphql: 'GraphQL', gql: 'GraphQL',
+  text: 'Text', plain: 'Text', txt: 'Text',
+};
+
 marked.setOptions({
   breaks: true,
   gfm: true,
 });
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function codeRenderer({ text, lang }) {
+  const langName = languageNames[lang] || lang || 'Text';
+  const hasLines = text.includes('\n');
+  const lines = text.split('\n');
+  const codeHtml = lines.map((line, i) => {
+    const num = hasLines ? `<span class="ln">${i + 1}</span>` : '';
+    const content = escapeHtml(line || ' ');
+    return `<span class="cl">${num}<span class="cc">${content}</span></span>`;
+  }).join('');
+
+  return `<div class="cb-wrap">
+    <div class="cb-header">
+      <span class="cb-lang">${langName}</span>
+      <button class="cb-copy" data-cb="${escapeHtml(text)}">Copy</button>
+    </div>
+    <pre><code>${codeHtml}</code></pre>
+  </div>`;
+}
+
+let lastRenderedId = 0;
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  lastRenderedId++;
+  const id = lastRenderedId;
+
+  const raw = marked.parse(text, {
+    renderer: { code: codeRenderer }
+  });
+
+  const safe = raw
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '');
+
+  setTimeout(() => attachCodeCopyHandlers(id), 0);
+  return safe;
+}
+
+function attachCodeCopyHandlers(id) {
+  document.querySelectorAll('.cb-wrap .cb-copy').forEach(btn => {
+    if (btn.dataset.handled) return;
+    btn.dataset.handled = '1';
+    btn.addEventListener('click', async () => {
+      const code = btn.dataset.cb;
+      if (!code) return;
+      try {
+        await navigator.clipboard.writeText(code);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch {
+        btn.textContent = 'Failed';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      }
+    });
+  });
+}
 
 async function init() {
   await loadHistory();
@@ -403,27 +496,6 @@ function renderMessages() {
     if (msg.role === 'system') return;
     appendMessage(msg.role, msg.content);
   });
-}
-
-function renderMarkdown(text) {
-  if (!text) return '';
-  const raw = marked.parse(text);
-
-  const sanitized = raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '');
-
-  return sanitized;
-}
-
-function escapeHtml(text) {
-  const d = document.createElement('div');
-  d.textContent = text;
-  return d.innerHTML;
 }
 
 let scrollInstant = false;
