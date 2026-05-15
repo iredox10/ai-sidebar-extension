@@ -36,9 +36,7 @@ let isProcessing = false;
 async function init() {
   await loadConversation();
 
-  const settings = await chrome.storage.sync.get([
-    'provider', 'model', 'openaiKey', 'anthropicKey', 'googleKey'
-  ]);
+  const settings = await chrome.storage.sync.get(['provider', 'model']);
 
   if (settings.provider) providerSelect.value = settings.provider;
   updateModels();
@@ -57,7 +55,7 @@ async function init() {
   });
 
   messageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
@@ -87,7 +85,7 @@ function updateModels() {
 function autoResizeInput() {
   messageInput.addEventListener('input', () => {
     messageInput.style.height = 'auto';
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 100) + 'px';
   });
 }
 
@@ -107,73 +105,112 @@ async function loadConversation() {
 
 function addMessage(role, content) {
   messages.push({ role, content });
-  renderMessages();
+  appendMessage(role, content, messages.length - 1);
   scrollToBottom();
   persistConversation();
 }
 
-function renderMessages() {
-  chatArea.innerHTML = messages.map((msg, i) => {
-    if (msg.role === 'system') return '';
-    const escaped = escapeHtml(msg.content);
-    return `
-      <div class="message ${msg.role === 'user' ? 'user' : 'ai'}">
-        <div class="message-label">
-          ${msg.role === 'user' ? 'You' : 'AI'}
-          ${msg.role === 'assistant' ? `<button class="copy-btn" data-index="${i}" title="Copy response"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg></button>` : ''}
-        </div>
-        <div class="message-content">${formatContent(escaped)}</div>
-      </div>
-    `;
-  }).join('');
+function appendMessage(role, content, index) {
+  const div = document.createElement('div');
+  div.className = `msg-group ${role}`;
 
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.dataset.index);
-      const msg = messages[idx];
-      if (msg) {
-        navigator.clipboard.writeText(msg.content);
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<span style="font-size:10px">Copied</span>';
-        setTimeout(() => btn.innerHTML = orig, 1500);
-      }
+  const isUser = role === 'user';
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.textContent = isUser ? 'You' : 'AI';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = formatContent(escapeHtml(content));
+
+  div.appendChild(meta);
+  div.appendChild(bubble);
+
+  if (!isUser) {
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    actions.innerHTML = `
+      <button class="copy-btn" title="Copy">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+      </button>
+    `;
+    actions.querySelector('.copy-btn').addEventListener('click', () => {
+      navigator.clipboard.writeText(content);
+      const btn = actions.querySelector('.copy-btn');
+      btn.innerHTML = '<span style="font-size:10px;color:var(--accent)">Copied</span>';
+      setTimeout(() => {
+        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>`;
+      }, 1500);
     });
+    div.appendChild(actions);
+  }
+
+  chatArea.appendChild(div);
+  removeEmptyState();
+}
+
+function renderMessages() {
+  chatArea.innerHTML = '';
+  messages.forEach((msg, i) => {
+    if (msg.role === 'system') return;
+    appendMessage(msg.role, msg.content, i);
   });
 }
 
 function formatContent(text) {
   return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      const langClass = lang ? ` class="lang-${lang}"` : '';
+      return `<pre${langClass}><code>${escapeHtml(code.trim())}</code></pre>`;
+    })
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\n/g, '<br>');
 }
 
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
 }
 
 function scrollToBottom() {
   requestAnimationFrame(() => {
-    chatArea.scrollTop = chatArea.scrollHeight;
+    chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' });
   });
 }
 
+function removeEmptyState() {
+  const empty = chatArea.querySelector('.empty-state');
+  if (empty) empty.remove();
+}
+
+function showEmptyState() {
+  chatArea.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path>
+        </svg>
+      </div>
+      <h3>Start a conversation</h3>
+      <p>Ask anything or right-click text on any page to analyze it with AI.</p>
+    </div>
+  `;
+}
+
 function showTyping() {
-  chatArea.insertAdjacentHTML('beforeend', `
-    <div class="message ai" id="typingIndicator">
-      <div class="message-label">AI</div>
-      <div class="message-content">
-        <div class="typing-indicator">
-          <span></span><span></span><span></span>
-        </div>
+  const div = document.createElement('div');
+  div.className = 'msg-group ai';
+  div.id = 'typingIndicator';
+  div.innerHTML = `
+    <div class="msg-meta">AI</div>
+    <div class="msg-bubble">
+      <div class="typing-indicator">
+        <span></span><span></span><span></span>
       </div>
     </div>
-  `);
+  `;
+  chatArea.appendChild(div);
   scrollToBottom();
 }
 
@@ -183,19 +220,18 @@ function hideTyping() {
 }
 
 function showError(errorMsg) {
-  const id = 'error-' + Date.now();
-  chatArea.insertAdjacentHTML('beforeend', `
-    <div class="error-msg" id="${id}">
-      <div style="margin-bottom:8px">${escapeHtml(errorMsg)}</div>
-      <button class="btn btn-sm btn-primary retry-btn" data-error-id="${id}">Retry</button>
-    </div>
-  `);
-  scrollToBottom();
-
-  document.querySelector(`#${id} .retry-btn`).addEventListener('click', () => {
-    document.getElementById(id)?.remove();
+  const div = document.createElement('div');
+  div.className = 'error-msg';
+  div.innerHTML = `
+    <div>${escapeHtml(errorMsg)}</div>
+    <button class="btn btn-xs retry-btn">Retry</button>
+  `;
+  div.querySelector('.retry-btn').addEventListener('click', () => {
+    div.remove();
     sendMessage();
   });
+  chatArea.appendChild(div);
+  scrollToBottom();
 }
 
 async function sendMessage() {
@@ -205,7 +241,9 @@ async function sendMessage() {
   messageInput.value = '';
   messageInput.style.height = 'auto';
 
-  removeLastError();
+  const lastError = chatArea.querySelector('.error-msg:last-child');
+  if (lastError) lastError.remove();
+
   addMessage('user', text);
 
   isProcessing = true;
@@ -237,16 +275,13 @@ async function sendMessage() {
   }
 }
 
-function removeLastError() {
-  const errors = chatArea.querySelectorAll('.error-msg');
-  if (errors.length > 0) errors[errors.length - 1].remove();
-}
-
 function clearChat() {
   messages = [];
   chatArea.innerHTML = '';
   chrome.storage.local.remove(STORAGE_KEY);
+  showEmptyState();
   messageInput.focus();
 }
 
+if (!messages.length) showEmptyState();
 init();

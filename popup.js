@@ -15,7 +15,7 @@ document.getElementById('askSelected').addEventListener('click', (e) => {
       if (response?.text) {
         chrome.runtime.sendMessage({ type: 'ask-ai', text: response.text });
       } else {
-        chrome.tabs.create({ url: 'chrome://version' }, () => {
+        chrome.tabs.create({ url: 'about:blank' }, () => {
           window.close();
         });
       }
@@ -33,20 +33,15 @@ async function loadStatus() {
   const statusText = document.getElementById('statusText');
 
   if (hasKey) {
-    statusDot.className = 'status-dot configured';
+    statusDot.className = 'status-dot on';
     statusText.textContent = 'Configured';
   } else {
-    statusDot.className = 'status-dot not-configured';
+    statusDot.className = 'status-dot off';
     statusText.textContent = 'Not configured';
   }
 
-  const providers = [];
-  if (settings.openaiKey) providers.push('OpenAI');
-  if (settings.anthropicKey) providers.push('Anthropic');
-  if (settings.googleKey) providers.push('Google');
-
   document.getElementById('activeProvider').textContent =
-    settings.provider || (providers[0] || 'None');
+    settings.provider || 'None';
   document.getElementById('activeModel').textContent =
     settings.model || 'gpt-4o';
 }

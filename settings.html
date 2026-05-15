@@ -7,146 +7,138 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     body {
-      max-width: 640px;
+      max-width: 600px;
       margin: 0 auto;
-      padding: 32px 24px;
+      padding: 32px 20px 80px;
+      min-height: 100vh;
     }
     .page-header {
       margin-bottom: 32px;
+      text-align: center;
+    }
+    .page-header .brand-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 14px;
+      font-family: var(--font-heading);
+      font-size: 20px; font-weight: 700; color: #0a0a14;
+      box-shadow: 0 4px 16px var(--accent-glow);
     }
     .page-header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 4px;
+      font-size: 22px; font-weight: 700; margin-bottom: 4px;
     }
     .page-header p {
-      color: var(--text-secondary);
-      font-size: 14px;
+      color: var(--text-secondary); font-size: 14px;
     }
+
     .section {
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
     .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-family: var(--font-heading);
+      font-size: 13px; font-weight: 600;
+      margin-bottom: 10px; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
     }
-    .section-title .badge {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: var(--bg-card);
+
+    .provider-card {
+      background: var(--surface);
       border: 1px solid var(--border);
-      color: var(--text-secondary);
-      font-weight: 400;
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.2s ease;
     }
-    .api-input {
-      position: relative;
+    .provider-card:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
-    .api-input .input {
-      padding-right: 80px;
+    .provider-card + .provider-card {
+      margin-top: 12px;
     }
-    .api-input .toggle-vis {
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 11px;
-      color: var(--primary);
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 4px 8px;
+    .provider-card .top {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
     }
-    .api-input .toggle-vis:hover {
-      text-decoration: underline;
-    }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      margin-top: 6px;
-    }
-    .status-badge.saved {
-      color: var(--success);
-    }
-    .status-badge.unsaved {
-      color: var(--text-secondary);
-    }
-    .provider-icon {
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      font-weight: 700;
-      color: white;
+    .provider-card .provider-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-heading);
+      font-size: 13px; font-weight: 700; color: white;
       flex-shrink: 0;
     }
-    .provider-icon.openai { background: #10a37f; }
-    .provider-icon.anthropic { background: #d97757; }
-    .provider-icon.google { background: #4285f4; }
-    .provider-icon.custom { background: #6b7280; }
-    .save-all {
-      position: sticky;
-      bottom: 0;
-      padding: 16px 0;
-      background: var(--bg);
+    .provider-card .provider-icon.openai { background: linear-gradient(135deg, #10a37f, #0d8c6e); }
+    .provider-card .provider-icon.anthropic { background: linear-gradient(135deg, #d97757, #c06848); }
+    .provider-card .provider-icon.google { background: linear-gradient(135deg, #4285f4, #3367d6); }
+    .provider-card .provider-name {
+      font-family: var(--font-heading);
+      font-weight: 600; font-size: 14px; flex: 1;
+    }
+    .provider-card .provider-badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 100px;
+      background: var(--surface-hover); border: 1px solid var(--border-light);
+      color: var(--text-muted);
+    }
+    .provider-card .api-input-wrap {
+      position: relative;
+    }
+    .provider-card .api-input-wrap input {
+      padding-right: 70px;
+    }
+    .provider-card .toggle-vis {
+      position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      font-size: 11px; color: var(--text-secondary); background: none; border: none;
+      cursor: pointer; padding: 4px 8px; border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .provider-card .toggle-vis:hover { color: var(--text); background: var(--surface-hover); }
+    .provider-card .status-badge {
+      font-size: 11px; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .provider-card .status-badge.saved { color: var(--success); }
+    .provider-card .status-badge.unsaved { color: var(--text-muted); }
+
+    .row { display: flex; gap: 12px; }
+    .row > * { flex: 1; }
+
+    .save-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 14px 20px;
+      background: rgba(10, 10, 20, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border-top: 1px solid var(--border);
-      margin-top: 32px;
+      display: flex; justify-content: center;
     }
-    .save-all button {
-      width: 100%;
-      padding: 12px;
-      font-size: 15px;
-      font-weight: 600;
-      justify-content: center;
+    .save-bar button {
+      max-width: 600px; width: 100%; padding: 12px;
+      font-size: 15px; font-weight: 600; justify-content: center;
     }
-    .help-link {
-      color: var(--primary);
-      text-decoration: none;
-      font-size: 12px;
+
+    textarea.input {
+      min-height: 100px; resize: vertical;
     }
-    .help-link:hover {
-      text-decoration: underline;
+
+    input[type="range"] {
+      width: 100%; height: 4px;
+      appearance: none;
+      background: var(--surface-hover);
+      border-radius: 2px; outline: none;
     }
-    .row {
-      display: flex;
-      gap: 12px;
-    }
-    .row > * {
-      flex: 1;
-    }
-    .system-prompt-area textarea {
-      min-height: 120px;
-      resize: vertical;
-    }
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .checkbox-row input[type="checkbox"] {
-      accent-color: var(--primary);
-    }
-    .checkbox-row label {
-      font-size: 13px;
-      color: var(--text-secondary);
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-glow);
     }
   </style>
 </head>
 <body>
   <div class="page-header">
-    <h1>AI Sidebar Settings</h1>
-    <p>Configure your API keys and preferences. Keys are stored locally in your browser.</p>
+    <div class="brand-icon">AI</div>
+    <h1>Settings</h1>
+    <p>Configure your API keys and preferences. Everything stays in your browser.</p>
   </div>
 
   <div class="section">
@@ -178,60 +170,62 @@
   </div>
 
   <div class="section">
-    <div class="section-title">
-      <span class="provider-icon openai">O</span>
-      OpenAI
-      <span class="badge">api.openai.com</span>
-    </div>
-    <div class="api-input">
-      <input type="password" id="openaiKey" class="input" placeholder="sk-...">
-      <button class="toggle-vis" data-target="openaiKey">Show</button>
-    </div>
-    <div class="status-badge unsaved" id="openaiStatus">Not saved</div>
-  </div>
+    <div class="section-title">API Keys</div>
 
-  <div class="section">
-    <div class="section-title">
-      <span class="provider-icon anthropic">A</span>
-      Anthropic
-      <span class="badge">api.anthropic.com</span>
+    <div class="provider-card">
+      <div class="top">
+        <div class="provider-icon openai">O</div>
+        <span class="provider-name">OpenAI</span>
+        <span class="provider-badge">api.openai.com</span>
+      </div>
+      <div class="api-input-wrap">
+        <input type="password" id="openaiKey" class="input" placeholder="sk-...">
+        <button class="toggle-vis" data-target="openaiKey">Show</button>
+      </div>
+      <div class="status-badge unsaved" id="openaiStatus">Not saved</div>
     </div>
-    <div class="api-input">
-      <input type="password" id="anthropicKey" class="input" placeholder="sk-ant-...">
-      <button class="toggle-vis" data-target="anthropicKey">Show</button>
-    </div>
-    <div class="status-badge unsaved" id="anthropicStatus">Not saved</div>
-  </div>
 
-  <div class="section">
-    <div class="section-title">
-      <span class="provider-icon google">G</span>
-      Google
-      <span class="badge">makersuite.google.com</span>
+    <div class="provider-card">
+      <div class="top">
+        <div class="provider-icon anthropic">A</div>
+        <span class="provider-name">Anthropic</span>
+        <span class="provider-badge">api.anthropic.com</span>
+      </div>
+      <div class="api-input-wrap">
+        <input type="password" id="anthropicKey" class="input" placeholder="sk-ant-...">
+        <button class="toggle-vis" data-target="anthropicKey">Show</button>
+      </div>
+      <div class="status-badge unsaved" id="anthropicStatus">Not saved</div>
     </div>
-    <div class="api-input">
-      <input type="password" id="googleKey" class="input" placeholder="AIza...">
-      <button class="toggle-vis" data-target="googleKey">Show</button>
+
+    <div class="provider-card">
+      <div class="top">
+        <div class="provider-icon google">G</div>
+        <span class="provider-name">Google</span>
+        <span class="provider-badge">makersuite.google.com</span>
+      </div>
+      <div class="api-input-wrap">
+        <input type="password" id="googleKey" class="input" placeholder="AIza...">
+        <button class="toggle-vis" data-target="googleKey">Show</button>
+      </div>
+      <div class="status-badge unsaved" id="googleStatus">Not saved</div>
     </div>
-    <div class="status-badge unsaved" id="googleStatus">Not saved</div>
   </div>
 
   <div class="section">
     <div class="section-title">System Prompt</div>
-    <div class="system-prompt-area">
-      <textarea id="systemPrompt" class="input" placeholder="You are a helpful assistant."></textarea>
-    </div>
+    <textarea id="systemPrompt" class="input" placeholder="You are a helpful assistant."></textarea>
   </div>
 
   <div class="section">
     <div class="section-title">Temperature</div>
-    <div class="row items-center">
-      <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" style="flex:1;accent-color:var(--primary);">
-      <span id="tempValue" style="min-width:32px;text-align:center;font-size:14px;color:var(--text-secondary);">0.7</span>
+    <div class="row items-center" style="display:flex;align-items:center;gap:16px;">
+      <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" style="flex:1;">
+      <span id="tempValue" style="min-width:32px;text-align:center;font-size:15px;font-weight:600;font-family:var(--font-heading);color:var(--accent);">0.7</span>
     </div>
   </div>
 
-  <div class="save-all">
+  <div class="save-bar">
     <button class="btn btn-primary" id="saveBtn">Save Settings</button>
   </div>
 

@@ -1,8 +1,7 @@
-const saveBtn = document.getElementById('saveBtn');
-
 document.querySelectorAll('.toggle-vis').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = document.getElementById(btn.dataset.target);
+    if (!input) return;
     const isPassword = input.type === 'password';
     input.type = isPassword ? 'text' : 'password';
     btn.textContent = isPassword ? 'Hide' : 'Show';
@@ -39,8 +38,7 @@ async function loadSettings() {
     'provider', 'model', 'systemPrompt', 'temperature'
   ]);
 
-  const keyFields = ['openaiKey', 'anthropicKey', 'googleKey'];
-  keyFields.forEach(key => {
+  ['openaiKey', 'anthropicKey', 'googleKey'].forEach(key => {
     const el = document.getElementById(key);
     if (settings[key]) {
       el.value = settings[key];
@@ -64,9 +62,14 @@ function updateStatus(key, saved) {
   if (!el) return;
   el.className = `status-badge ${saved ? 'saved' : 'unsaved'}`;
   el.textContent = saved ? 'Saved' : 'Not saved';
+  if (saved) {
+    el.innerHTML = '<span style="color:var(--success)">●</span> Saved';
+  } else {
+    el.innerHTML = '<span style="color:var(--text-muted)">○</span> Not saved';
+  }
 }
 
-saveBtn.addEventListener('click', async () => {
+document.getElementById('saveBtn').addEventListener('click', async () => {
   const data = {
     openaiKey: document.getElementById('openaiKey').value.trim(),
     anthropicKey: document.getElementById('anthropicKey').value.trim(),
@@ -77,7 +80,6 @@ saveBtn.addEventListener('click', async () => {
     temperature: parseFloat(document.getElementById('temperature').value),
   };
 
-  // Remove empty keys so they don't override null in storage
   Object.keys(data).forEach(k => {
     if (data[k] === '') data[k] = undefined;
   });
@@ -88,8 +90,13 @@ saveBtn.addEventListener('click', async () => {
     updateStatus(key, !!data[key]);
   });
 
-  saveBtn.textContent = 'Saved!';
-  setTimeout(() => { saveBtn.textContent = 'Save Settings'; }, 2000);
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = 'Saved!';
+  btn.style.background = 'linear-gradient(135deg, var(--success), #16a34a)';
+  setTimeout(() => {
+    btn.textContent = 'Save Settings';
+    btn.style.background = '';
+  }, 2000);
 });
 
 loadSettings();
