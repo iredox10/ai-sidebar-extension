@@ -174,6 +174,20 @@ function highlightCode(text, lang) {
   }).join('');
 }
 
+const COLLAPSE_THRESHOLD = 20;
+const COLLAPSE_SHOW = 15;
+
+function detectDiff(lines) {
+  const hasMarkers = lines.some(l => /^[+\-]\s/.test(l));
+  const allMarked = lines.every(l => /^[+\-]?\s*.*/.test(l) && (l.trim() === '' || /^[+\-\s]/.test(l)));
+  if (!hasMarkers || !allMarked) return null;
+  return lines.map(l => {
+    if (/^\+/.test(l)) return { prefix: '+', text: l.replace(/^\+ ?/, '') };
+    if (/^\-/.test(l)) return { prefix: '-', text: l.replace(/^\- ?/, '') };
+    return { prefix: '', text: l };
+  });
+}
+
 function enhanceCodeBlocks(html) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = html;
@@ -183,28 +197,75 @@ function enhanceCodeBlocks(html) {
     if (pre.closest('.cb-wrap')) return;
 
     const text = codeEl.textContent;
-    const classMatch = codeEl.className.match(/language-(\w+)/);
-    const lang = classMatch ? classMatch[1] : '';
-    const langName = languageNames[lang] || lang || 'Text';
-    const hasLines = text.includes('\n');
-    const lines = text.split('\n');
+    const classMatch = codeEl.className.match(/language-([\w.+#-]+)/);
+    const rawLang = classMatch ? classMatch[1] : '';
 
-    const highlighted = highlightCode(text, lang);
-    const highlightedLines = highlighted.split('\n');
-    const codeHtml = highlightedLines.map((line, i) => {
+    let filename = '', lang = rawLang;
+    if (rawLang.includes('.')) {
+      const parts = rawLang.split('.');
+      lang = parts[0];
+      filename = rawLang;
+    }
+
+    const langName = languageNames[lang] || lang || 'Text';
+    const lines = text.split('\n');
+    const lineCount = lines.length;
+    const hasLines = lineCount > 1;
+
+    const diffInfo = detectDiff(lines);
+    const isDiff = diffInfo !== null;
+    const textToHighlight = isDiff ? diffInfo.map(d => d.text).join('\n') : text;
+
+    const highlighted = highlightCode(textToHighlight, lang);
+    const hlLines = highlighted.split('\n');
+
+    const codeHtml = hlLines.map((line, i) => {
       const num = hasLines ? `<span class="ln">${i + 1}</span>` : '';
-      return `<span class="cl">${num}<span class="cc">${line || ' '}</span></span>`;
+      let extraCls = '';
+      if (isDiff && diffInfo[i]) {
+        if (diffInfo[i].prefix === '+') extraCls = ' hl-add';
+        else if (diffInfo[i].prefix === '-') extraCls = ' hl-del';
+      }
+      return `<span class="cl${extraCls}">${num}<span class="cc">${line || ' '}</span></span>`;
     }).join('');
 
+    const headerParts = [];
+    if (filename) headerParts.push(`<span class="cb-filename">${escapeHtml(filename)}</span>`);
+    headerParts.push(`<span class="cb-lang">${langName}</span>`);
+    if (hasLines) headerParts.push(`<span class="cb-lines">${lineCount} lines</span>`);
+    const leftHeader = headerParts.join('');
+
+    const isCollapsible = lineCount > COLLAPSE_THRESHOLD;
+    const collapsed = isCollapsible;
+    const previewLines = isCollapsible ? COLLAPSE_SHOW : lineCount;
+
     const wrap = document.createElement('div');
-    wrap.className = 'cb-wrap';
+    wrap.className = `cb-wrap${collapsed ? ' cb-collapsed' : ''}`;
+    const collapseHtml = isCollapsible
+      ? `<button class="cb-collapse-btn">Show ${lineCount - COLLAPSE_SHOW} more lines</button>`
+      : '';
     wrap.innerHTML = `
       <div class="cb-header">
-        <span class="cb-lang">${langName}</span>
-        <button class="cb-copy">Copy</button>
+        <div class="cb-header-left">${leftHeader}</div>
+        <div class="cb-header-right">
+          <button class="cb-wrap-toggle" title="Toggle word wrap">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 11h10"/><path d="M4 15h6"/><path d="M4 19h14"/></svg>
+          </button>
+          <button class="cb-copy">Copy</button>
+        </div>
       </div>
       <pre><code>${codeHtml}</code></pre>
+      ${collapseHtml}
     `;
+
+    if (isCollapsible) {
+      const codeBlock = wrap.querySelector('pre code');
+      const firstLines = [];
+      codeBlock.querySelectorAll('.cl').forEach((el, i) => {
+        if (i < previewLines) firstLines.push(el);
+        else el.style.display = 'none';
+      });
+    }
 
     pre.replaceWith(wrap);
   });
@@ -231,20 +292,49 @@ function renderMarkdown(text) {
 }
 
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.cb-copy');
-  if (!btn) return;
-  const wrap = btn.closest('.cb-wrap');
+  const wrap = e.target.closest('.cb-wrap');
   if (!wrap) return;
-  const code = wrap.querySelector('code')?.textContent;
-  if (!code) return;
-  navigator.clipboard.writeText(code).then(() => {
-    btn.textContent = 'Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-  }).catch(() => {
-    btn.textContent = 'Failed';
-    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-  });
+
+  const copyBtn = e.target.closest('.cb-copy');
+  if (copyBtn) {
+    const code = wrap.querySelector('code')?.textContent;
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      copyBtn.textContent = 'Copied!';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 2000);
+    }).catch(() => {
+      copyBtn.textContent = 'Failed';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+    });
+    return;
+  }
+
+  const wrapToggle = e.target.closest('.cb-wrap-toggle');
+  if (wrapToggle) {
+    wrap.classList.toggle('cb-wrapped');
+    const isWrapped = wrap.classList.contains('cb-wrapped');
+    wrapToggle.innerHTML = isWrapped
+      ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16"/><path d="M17 11l4 4-4 4"/><path d="M4 15h10"/><path d="M4 19h14"/></svg>`
+      : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 11h10"/><path d="M4 15h6"/><path d="M4 19h14"/></svg>`;
+    return;
+  }
+
+  const collapseBtn = e.target.closest('.cb-collapse-btn');
+  if (collapseBtn) {
+    const wasCollapsed = wrap.classList.contains('cb-collapsed');
+    wrap.classList.toggle('cb-collapsed');
+    const code = wrap.querySelector('pre code');
+    const lines = code.querySelectorAll('.cl');
+    if (wasCollapsed) {
+      lines.forEach(el => el.style.display = '');
+      collapseBtn.textContent = 'Show less';
+    } else {
+      lines.forEach((el, i) => { if (i >= COLLAPSE_SHOW) el.style.display = 'none'; });
+      collapseBtn.textContent = `Show ${lines.length - COLLAPSE_SHOW} more lines`;
+    }
+    return;
+  }
 });
 
 async function init() {
