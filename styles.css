@@ -140,6 +140,25 @@ input, textarea, select { font-family: var(--font-sans); outline: none; }
 .msg-bubble li { margin-bottom: 0.25em; }
 .msg-bubble code:not(.cc) { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.9em; color: var(--text-primary); }
 
+/* Blockquote rendering for quoted messages */
+.msg-bubble blockquote {
+  margin: 6px 0; padding: 6px 12px;
+  border-left: 3px solid var(--accent);
+  background: rgba(255,255,255,0.04);
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+.msg-bubble blockquote p {
+  margin: 0; color: inherit;
+}
+.msg-bubble blockquote + p {
+  margin-top: 8px;
+}
+.msg-bubble blockquote:first-child {
+  margin-top: 0;
+}
+
 /* Avatars */
 .avatar { width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .user-avatar { background: var(--border-strong); color: var(--text-primary); }
@@ -204,6 +223,36 @@ input, textarea, select { font-family: var(--font-sans); outline: none; }
 .cb-wrap pre::-webkit-scrollbar-track { background: transparent; }
 .cb-wrap pre::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
 .cb-wrap pre::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* ── Quote Preview ── */
+.quote-preview {
+  display: none; align-items: center; gap: 8px;
+  background: rgba(18,18,18,0.85); backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  padding: 8px 12px;
+  margin-bottom: -1px;
+  animation: fadeUp 0.2s ease both;
+}
+.quote-preview-icon {
+  flex-shrink: 0; width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); opacity: 0.7;
+}
+.quote-preview-text {
+  flex: 1; font-size: 12px; color: var(--text-secondary); line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-left: 8px; border-left: 2px solid var(--accent);
+  font-style: italic;
+}
+.quote-preview-dismiss {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; transition: var(--transition-fast);
+  background: none; border: none;
+}
+.quote-preview-dismiss:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
 
 /* ── Attachment Bar ── */
 .attach-bar {
@@ -537,6 +586,38 @@ input, textarea, select { font-family: var(--font-sans); outline: none; }
   box-shadow: var(--shadow-lg); text-align: center;
 }
 .toast-msg.open { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+
+/* ── Selection Toolbar ── */
+.sel-toolbar {
+  position: fixed; z-index: 500;
+  display: flex; align-items: center; gap: 2px;
+  background: rgba(24, 24, 27, 0.96); backdrop-filter: blur(16px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  padding: 4px;
+  opacity: 0; pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.sel-toolbar.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.sel-toolbar-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; font-size: 12px; font-weight: 500;
+  color: var(--text-secondary); background: none; border: none;
+  border-radius: 4px; cursor: pointer; white-space: nowrap;
+  transition: var(--transition-fast);
+}
+.sel-toolbar-btn:hover { background: var(--accent-muted); color: var(--text-primary); }
+.sel-toolbar-btn svg { flex-shrink: 0; }
+.sel-toolbar::after {
+  content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%) rotate(45deg);
+  width: 8px; height: 8px;
+  background: rgba(24, 24, 27, 0.96); border: 1px solid var(--border-strong);
+  border-top: none; border-left: none;
+  pointer-events: none;
+}
+.sel-toolbar.open::after { pointer-events: none; }
 
 /* Model "text" badge */
 .model-no-vision {

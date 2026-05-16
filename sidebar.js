@@ -20,6 +20,9 @@ const attachBtn = document.getElementById('attachBtn');
 const fileInput = document.getElementById('fileInput');
 const attachBar = document.getElementById('attachBar');
 const attachList = document.getElementById('attachList');
+const quotePreview = document.getElementById('quotePreview');
+const quotePreviewText = document.getElementById('quotePreviewText');
+const quotePreviewDismiss = document.getElementById('quotePreviewDismiss');
 
 const modelDropdown = document.getElementById('modelDropdown');
 const modelToggle = document.getElementById('modelToggle');
@@ -69,6 +72,7 @@ let historyOpen = false;
 let lastSentText = '';
 let ready = false;
 let attachments = [];
+let quoteText = '';
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 const languageNames = {
@@ -577,6 +581,7 @@ async function newChat() {
   }
   if (historyOpen) closeHistory();
   clearAttachments();
+  clearQuote();
   createNewChat();
   messages = [];
   await chrome.storage.local.set({ active_chat_id: activeChatId });
@@ -1183,11 +1188,15 @@ async function sendMessage() {
     return;
   }
 
-  const text = messageInput.value.trim();
-  if (!text && attachments.length === 0) return;
+  const rawText = messageInput.value.trim();
+  if (!rawText && attachments.length === 0 && !quoteText) return;
   if (historyOpen) closeHistory();
 
-  lastSentText = text;
+  const text = quoteText
+    ? (rawText ? `> ${quoteText}\n\n${rawText}` : `> ${quoteText}`)
+    : rawText;
+
+  lastSentText = rawText;
   messageInput.value = '';
   messageInput.style.height = 'auto';
 
@@ -1209,6 +1218,7 @@ async function sendMessage() {
       isProcessing = false;
       sendBtn.classList.remove('processing');
       clearAttachments();
+      clearQuote();
       showToast(`${modelSelect.value} doesn't support images. Image was skipped. Switch to a vision model (e.g. GPT-4o, Claude Sonnet).`);
       messageInput.focus();
       return;
@@ -1239,6 +1249,7 @@ async function sendMessage() {
 
     hideTyping();
     clearAttachments();
+    clearQuote();
 
     if (result.ok) {
       addMessage('assistant', result.data.content);
@@ -1391,6 +1402,20 @@ function clearAttachments() {
   updateAttachButton();
 }
 
+function clearQuote() {
+  quoteText = '';
+  renderQuotePreview();
+}
+
+function renderQuotePreview() {
+  if (quoteText) {
+    quotePreviewText.textContent = quoteText;
+    quotePreview.style.display = 'flex';
+  } else {
+    quotePreview.style.display = 'none';
+  }
+}
+
 function showToast(msg, type = 'warning') {
   const existing = document.querySelector('.toast-msg');
   if (existing) existing.remove();
@@ -1453,6 +1478,79 @@ function updateActiveDisplay(provider, label) {
   activeModelIcon.innerHTML = providerIcons[provider] || '';
   activeModelName.textContent = label;
 }
+
+// ---- Selection Toolbar ----
+
+const selToolbar = document.getElementById('selToolbar');
+const selQuoteBtn = document.getElementById('selQuoteBtn');
+let selToolbarHideTimer = null;
+
+function hideSelToolbar() {
+  selToolbar.classList.remove('open');
+}
+
+function showSelToolbar(left, top, text) {
+  selToolbar.dataset.text = text;
+  selToolbar.style.left = left + 'px';
+  selToolbar.style.top = top + 'px';
+  selToolbar.classList.add('open');
+}
+
+selQuoteBtn.addEventListener('click', () => {
+  const text = selToolbar.dataset.text;
+  if (!text) return;
+  quoteText = text;
+  renderQuotePreview();
+  messageInput.focus();
+  hideSelToolbar();
+  window.getSelection()?.removeAllRanges();
+});
+
+quotePreviewDismiss.addEventListener('click', () => {
+  quoteText = '';
+  renderQuotePreview();
+  messageInput.focus();
+});
+
+selToolbar.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+});
+
+function isAIRubyOrBubble(el) {
+  return el && el.closest('.message.ai .msg-bubble');
+}
+
+function isInsideCodeBlock(el) {
+  return el && el.closest('.cb-wrap, pre code');
+}
+
+document.addEventListener('mouseup', (e) => {
+  if (e.target.closest('.sel-toolbar')) return;
+  clearTimeout(selToolbarHideTimer);
+  selToolbarHideTimer = setTimeout(() => {
+    const bubble = isAIRubyOrBubble(e.target);
+    if (!bubble) { hideSelToolbar(); return; }
+    if (isInsideCodeBlock(e.target)) { hideSelToolbar(); return; }
+    const selection = window.getSelection();
+    const text = selection ? selection.toString().trim() : '';
+    if (!text || text.length < 2) { hideSelToolbar(); return; }
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) { hideSelToolbar(); return; }
+    const tw = 150;
+    let left = rect.left + rect.width / 2 - tw / 2;
+    let top = rect.top - 12;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    if (top < 4) top = rect.bottom + 12;
+    showSelToolbar(left, top, text);
+  }, 80);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideSelToolbar();
+}, true);
+
+document.addEventListener('scroll', hideSelToolbar, true);
 
 init();
 
