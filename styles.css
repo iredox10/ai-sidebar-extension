@@ -200,6 +200,8 @@ input, textarea, select { font-family: var(--font-sans); outline: none; }
   display: flex; flex-direction: column;
 }
 .history-slideover.open .history-panel { transform: translateX(0); }
+.history-search-input { width: 100%; padding: 8px 12px 8px 32px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; outline: none; transition: border-color var(--transition-fast); }
+.history-search-input:focus { border-color: rgba(255,255,255,0.3); }
 
 /* Bento Box Settings Layout */
 .layout-settings { padding: 40px 20px; max-width: 800px; margin: 0 auto; }
@@ -253,9 +255,19 @@ input, textarea, select { font-family: var(--font-sans); outline: none; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Empty State */
-.empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--text-secondary); }
-.empty-icon { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
+/* Empty State Prompt Grid */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; margin-top: -20px; }
+.empty-state-icon { margin-bottom: 24px; color: var(--text-tertiary); opacity: 0.5; }
+.empty-state h3 { font-size: 20px; font-weight: 500; margin-bottom: 32px; color: var(--text-primary); letter-spacing: -0.02em; }
+
+.prompt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 600px; padding: 0 16px; }
+.prompt-btn { display: flex; align-items: flex-start; gap: 12px; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); text-align: left; cursor: pointer; transition: all var(--transition-fast); }
+.prompt-btn:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.prompt-btn svg { flex-shrink: 0; margin-top: 2px; }
+.prompt-text { display: flex; flex-direction: column; gap: 4px; }
+.prompt-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.prompt-desc { font-size: 12px; color: var(--text-tertiary); }
+@media (max-width: 400px) { .prompt-grid { grid-template-columns: 1fr; } }
 
 /* Mouse Tracking Glow */
 .bento-card, .input-island, .msg-bubble, .cb-wrap {
