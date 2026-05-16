@@ -11,6 +11,11 @@ const historyOverlay = document.getElementById('historyOverlay');
 const historyClose = document.getElementById('historyClose');
 const historyList = document.getElementById('historyList');
 const historyNewBtn = document.getElementById('historyNewBtn');
+const historySearch = document.getElementById('historySearch');
+const historySearchClear = document.getElementById('historySearchClear');
+const historyResizeHandle = document.getElementById('historyResizeHandle');
+const contextMenu = document.getElementById('contextMenu');
+const historyCount = document.getElementById('historyCount');
 
 const modelDropdown = document.getElementById('modelDropdown');
 const modelToggle = document.getElementById('modelToggle');
@@ -398,8 +403,13 @@ async function init() {
 
   historyToggle.addEventListener('click', toggleHistory);
   historyClose.addEventListener('click', closeHistory);
-  historyOverlay.addEventListener('click', closeHistory);
+  historyOverlay.addEventListener('click', (e) => { if (e.target === historyOverlay) { closeHistory(); hideContextMenu(); } });
   historyNewBtn.addEventListener('click', () => { closeHistory(); newChat(); });
+
+  initResize();
+  initHistorySearch();
+  document.addEventListener('click', (e) => { if (!contextMenu.contains(e.target)) hideContextMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideContextMenu(); });
 
   const chat = getActiveChat();
   messages = chat ? [...chat.messages] : [];
@@ -515,38 +525,12 @@ async function switchToChat(chatId) {
   messageInput.focus();
 }
 
-async function deleteChat(chatId) {
-  const chat = chatHistory.find(c => c.id === chatId);
-  if (!chat) return;
-  const msgCount = chat.messages.length;
-  const label = msgCount > 0 ? `"${chat.title}" (${msgCount} messages)` : 'this conversation';
-  if (!confirm(`Delete ${label}?`)) return;
-
-  const idx = chatHistory.findIndex(c => c.id === chatId);
-  chatHistory.splice(idx, 1);
-  await saveHistory();
-  renderHistoryList();
-
-  if (activeChatId === chatId) {
-    if (chatHistory.length > 0) {
-      await switchToChat(chatHistory[0].id);
-    } else {
-      createNewChat();
-      messages = [];
-      await chrome.storage.local.set({ active_chat_id: activeChatId });
-      renderMessages();
-      showEmptyState();
-      closeHistory();
-      updateModelBar();
-    }
-  }
-}
-
 async function newChat() {
   if (isProcessing) return;
   if (getActiveChat() && messages.length > 0) {
     await saveCurrentChat();
   }
+  if (historyOpen) closeHistory();
   createNewChat();
   messages = [];
   await chrome.storage.local.set({ active_chat_id: activeChatId });
@@ -571,6 +555,9 @@ function updateModelBar() {
 
 // ---- History Panel ----
 
+let contextChatId = null;
+let historySearchQuery = '';
+
 function toggleHistory() {
   historyOpen ? closeHistory() : openHistory();
 }
@@ -580,7 +567,10 @@ function openHistory() {
   historyPanel.classList.add('open');
   historyOverlay.classList.add('open');
   historyToggle.classList.add('active');
+  historySearch.value = '';
+  historySearchQuery = '';
   renderHistoryList();
+  setTimeout(() => historySearch.focus(), 150);
 }
 
 function closeHistory() {
@@ -588,56 +578,202 @@ function closeHistory() {
   historyPanel.classList.remove('open');
   historyOverlay.classList.remove('open');
   historyToggle.classList.remove('active');
+  hideContextMenu();
+}
+
+function getPreviewText(chat) {
+  const msgs = chat.messages || [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'user' || msgs[i].role === 'assistant') {
+      const text = msgs[i].content.replace(/\n/g, ' ').trim();
+      if (text.length > 0) return text.length > 80 ? text.slice(0, 80) + '...' : text;
+    }
+  }
+  return '';
+}
+
+function highlightMatch(text, query) {
+  if (!query) return escapeHtml(text);
+  const escaped = escapeHtml(text);
+  const q = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return escaped.replace(new RegExp(`(${q})`, 'gi'), '<span class="hl-match">$1</span>');
 }
 
 function renderHistoryList() {
-  if (chatHistory.length === 0) {
-    historyList.innerHTML = `
-      <div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;">
-        No conversations yet.<br>Start a new chat to begin.
-      </div>
-    `;
+  const query = historySearchQuery.toLowerCase().trim();
+
+  let displayChats = chatHistory;
+  if (query) {
+    displayChats = chatHistory.filter(chat => {
+      if (chat.title && chat.title.toLowerCase().includes(query)) return true;
+      return chat.messages.some(m => m.content.toLowerCase().includes(query));
+    });
+  }
+
+  historyCount.textContent = displayChats.length;
+
+  if (displayChats.length === 0) {
+    historyList.innerHTML = query
+      ? `<div class="history-empty"><div class="history-empty-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><div class="history-empty-text">No matching conversations</div><div class="history-empty-sub">Try a different search term</div></div>`
+      : `<div class="history-empty"><div class="history-empty-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div><div class="history-empty-text">No conversations yet</div><div class="history-empty-sub">Start a new chat to begin</div></div>`;
     return;
   }
 
-  const groups = groupByDate(chatHistory);
   let html = '';
+
+  const pinned = displayChats.filter(c => c.pinned);
+  const unpinned = displayChats.filter(c => !c.pinned);
+
+  if (pinned.length) {
+    html += `<div class="history-date-heading">Pinned</div>`;
+    for (const chat of pinned) {
+      html += buildHistoryItem(chat, query, true);
+    }
+  }
+
+  const groups = groupByDate(unpinned);
   for (const [label, items] of Object.entries(groups)) {
     html += `<div class="history-date-heading">${label}</div>`;
     for (const chat of items) {
-      const isActive = chat.id === activeChatId;
-      const timeStr = formatTime(chat.timestamp);
-      html += `
-        <div class="history-item ${isActive ? 'active' : ''}" data-id="${chat.id}">
-          <div class="h-item-icon">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
-          </div>
-          <div class="h-item-info">
-            <div class="h-item-title">${escapeHtml(chat.title)}</div>
-            <div class="h-item-meta">${timeStr} · ${chat.provider}</div>
-          </div>
-          <button class="h-item-delete" data-id="${chat.id}" title="Delete">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>
-          </button>
-        </div>
-      `;
+      html += buildHistoryItem(chat, query, false);
     }
   }
-  historyList.innerHTML = html;
 
+  historyList.innerHTML = html;
+  bindHistoryEvents();
+}
+
+function buildHistoryItem(chat, query, isPinned) {
+  const isActive = chat.id === activeChatId;
+  const timeStr = formatTime(chat.timestamp);
+  const preview = getPreviewText(chat);
+  const msgCount = chat.messages ? chat.messages.length : 0;
+  const providerLabel = chat.provider || '';
+
+  return `
+    <div class="history-item ${isActive ? 'active' : ''}${isPinned ? ' pinned' : ''}" data-id="${chat.id}" tabindex="0">
+      <div class="h-item-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <div class="h-item-body">
+        <div class="h-item-title">${highlightMatch(chat.title, query)}</div>
+        ${preview ? `<div class="h-item-preview">${highlightMatch(preview, query)}</div>` : ''}
+        <div class="h-item-meta-row">
+          <span class="h-item-time">${timeStr}</span>
+          ${providerLabel ? `<span class="h-item-badge">${providerLabel}</span>` : ''}
+          ${msgCount > 0 ? `<span class="h-item-badge">${msgCount} msgs</span>` : ''}
+        </div>
+      </div>
+      <div class="h-item-actions">
+        <button class="h-item-action-btn${chat.pinned ? ' pinned' : ''}" data-action="pin" title="${chat.pinned ? 'Unpin' : 'Pin'}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="${chat.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z"/></svg>
+        </button>
+        <button class="h-item-action-btn" data-action="delete" title="Delete">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function bindHistoryEvents() {
   historyList.querySelectorAll('.history-item').forEach(el => {
     el.addEventListener('click', (e) => {
-      if (e.target.closest('.h-item-delete')) return;
+      const actionBtn = e.target.closest('.h-item-action-btn');
+      if (actionBtn) {
+        const action = actionBtn.dataset.action;
+        if (action === 'delete') { e.stopPropagation(); deleteChat(el.dataset.id); }
+        if (action === 'pin') { e.stopPropagation(); togglePin(el.dataset.id); }
+        return;
+      }
       switchToChat(el.dataset.id);
     });
-  });
 
-  historyList.querySelectorAll('.h-item-delete').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteChat(btn.dataset.id);
+    el.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.h-item-action-btn')) return;
+      if (e.target.closest('.h-item-body')) {
+        startInlineRename(el.dataset.id);
+      }
+    });
+
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, el.dataset.id);
+    });
+
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { switchToChat(el.dataset.id); }
+      if (e.key === 'Delete' || e.key === 'Backspace') { deleteChat(el.dataset.id); }
     });
   });
+}
+
+function startInlineRename(chatId) {
+  const chat = chatHistory.find(c => c.id === chatId);
+  if (!chat) return;
+  const item = historyList.querySelector(`.history-item[data-id="${chatId}"]`);
+  if (!item) return;
+  const titleEl = item.querySelector('.h-item-title');
+  if (!titleEl) return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'h-item-title-edit';
+  input.value = chat.title;
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const finish = (save) => {
+    if (save && input.value.trim()) {
+      chat.title = input.value.trim();
+      saveHistory();
+      renderHistoryList();
+    } else {
+      renderHistoryList();
+    }
+  };
+
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { finish(false); }
+  });
+}
+
+function togglePin(chatId) {
+  const chat = chatHistory.find(c => c.id === chatId);
+  if (!chat) return;
+  chat.pinned = !chat.pinned;
+  saveHistory();
+  renderHistoryList();
+}
+
+function deleteChat(chatId) {
+  const chat = chatHistory.find(c => c.id === chatId);
+  if (!chat) return;
+  const msgCount = chat.messages.length;
+  const label = msgCount > 0 ? `"${chat.title}" (${msgCount} messages)` : 'this conversation';
+  if (!confirm(`Delete ${label}?`)) return;
+
+  const idx = chatHistory.findIndex(c => c.id === chatId);
+  chatHistory.splice(idx, 1);
+  saveHistory();
+  renderHistoryList();
+
+  if (activeChatId === chatId) {
+    if (chatHistory.length > 0) {
+      switchToChat(chatHistory[0].id);
+    } else {
+      createNewChat();
+      messages = [];
+      chrome.storage.local.set({ active_chat_id: activeChatId });
+      renderMessages();
+      showEmptyState();
+      closeHistory();
+      updateModelBar();
+    }
+  }
 }
 
 function groupByDate(chats) {
@@ -668,7 +804,131 @@ function formatTime(ts) {
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
   if (isToday) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const diff = now.getTime() - d.getTime();
+  if (diff < 7 * 86400000) return d.toLocaleDateString([], { weekday: 'short' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// ---- Context Menu ----
+
+function showContextMenu(x, y, chatId) {
+  contextChatId = chatId;
+  const chat = chatHistory.find(c => c.id === chatId);
+  contextMenu.innerHTML = `
+    <button class="context-item" data-action="rename">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Rename
+    </button>
+    <button class="context-item" data-action="pin">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z"/></svg>
+      ${chat && chat.pinned ? 'Unpin' : 'Pin to Top'}
+    </button>
+    <div class="context-divider"></div>
+    <button class="context-item" data-action="copy-title">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      Copy Title
+    </button>
+    <div class="context-divider"></div>
+    <button class="context-item danger" data-action="delete">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+      Delete
+    </button>
+  `;
+
+  contextMenu.style.left = Math.min(x, window.innerWidth - 170) + 'px';
+  contextMenu.style.top = Math.min(y, window.innerHeight - 200) + 'px';
+
+  contextMenu.querySelectorAll('.context-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+      if (action === 'rename') startInlineRename(contextChatId);
+      else if (action === 'pin') { togglePin(contextChatId); }
+      else if (action === 'copy-title') {
+        const c = chatHistory.find(ch => ch.id === contextChatId);
+        if (c) navigator.clipboard.writeText(c.title);
+      }
+      else if (action === 'delete') deleteChat(contextChatId);
+      hideContextMenu();
+    });
+  });
+
+  requestAnimationFrame(() => contextMenu.classList.add('open'));
+}
+
+function hideContextMenu() {
+  contextMenu.classList.remove('open');
+  contextChatId = null;
+}
+
+// ---- Resizable Panel ----
+
+function initResize() {
+  let isResizing = false;
+  let startX, startWidth;
+
+  historyResizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = historyPanel.offsetWidth;
+    historyPanel.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const delta = e.clientX - startX;
+    const newWidth = Math.max(240, Math.min(440, startWidth + delta));
+    historyPanel.style.width = newWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!isResizing) return;
+    isResizing = false;
+    historyPanel.classList.remove('resizing');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+}
+
+// ---- History Search ----
+
+function initHistorySearch() {
+  historySearch.addEventListener('input', () => {
+    historySearchQuery = historySearch.value;
+    renderHistoryList();
+  });
+
+  historySearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      historySearch.value = '';
+      historySearchQuery = '';
+      renderHistoryList();
+      historySearch.blur();
+    }
+    if (e.key === 'Enter') {
+      const first = historyList.querySelector('.history-item');
+      if (first) switchToChat(first.dataset.id);
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const items = historyList.querySelectorAll('.history-item');
+      if (!items.length) return;
+      const active = historyList.querySelector('.history-item.active') || items[0];
+      let idx = Array.from(items).indexOf(active);
+      idx = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+      items[idx].focus();
+      items[idx].scrollIntoView({ block: 'nearest' });
+    }
+  });
+
+  historySearchClear.addEventListener('click', () => {
+    historySearch.value = '';
+    historySearchQuery = '';
+    renderHistoryList();
+    historySearch.focus();
+  });
 }
 
 // ---- Messages ----
@@ -752,12 +1012,50 @@ function showEmptyState() {
   chatArea.innerHTML = `
     <div class="empty-state">
       <div class="empty-state-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
       </div>
-      <h3>Start a conversation</h3>
-      <p>Ask anything or right-click text on any page to analyze it with AI.</p>
+      <h3>How can I help you today?</h3>
+      
+      <div class="prompt-grid">
+        <button class="prompt-btn" data-prompt="Explain this code to me like I'm 5 years old">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          <div class="prompt-text">
+            <span class="prompt-title">Explain code</span>
+            <span class="prompt-desc">Like I'm 5 years old</span>
+          </div>
+        </button>
+        <button class="prompt-btn" data-prompt="Summarize the article on the current page">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg>
+          <div class="prompt-text">
+            <span class="prompt-title">Summarize page</span>
+            <span class="prompt-desc">Extract key points</span>
+          </div>
+        </button>
+        <button class="prompt-btn" data-prompt="Help me write a professional email">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          <div class="prompt-text">
+            <span class="prompt-title">Draft email</span>
+            <span class="prompt-desc">Professional tone</span>
+          </div>
+        </button>
+        <button class="prompt-btn" data-prompt="Brainstorm ideas for my new project">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <div class="prompt-text">
+            <span class="prompt-title">Brainstorm ideas</span>
+            <span class="prompt-desc">For a new project</span>
+          </div>
+        </button>
+      </div>
     </div>
   `;
+
+  chatArea.querySelectorAll('.prompt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      messageInput.value = btn.dataset.prompt;
+      messageInput.focus();
+      autoResizeInput();
+    });
+  });
 }
 
 function showTyping() {
