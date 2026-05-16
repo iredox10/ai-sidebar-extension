@@ -281,6 +281,9 @@ function enhanceCodeBlocks(html) {
           ${leftHeader}
         </div>
         <div class="cb-header-right">
+          <button class="cb-download" title="Download code">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
           <button class="cb-wrap-toggle" title="Toggle word wrap">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 11h10"/><path d="M4 15h6"/><path d="M4 19h14"/></svg>
           </button>
@@ -347,6 +350,28 @@ document.addEventListener('click', (e) => {
         copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>'; 
       }, 2000);
     });
+    return;
+  }
+
+  const downloadBtn = e.target.closest('.cb-download');
+  if (downloadBtn) {
+    const code = wrap.querySelector('code')?.textContent;
+    if (!code) return;
+    const langEl = wrap.querySelector('.cb-lang');
+    const lang = langEl ? langEl.textContent.trim().toLowerCase() : 'txt';
+    const extMap = { javascript: 'js', typescript: 'ts', python: 'py', rust: 'rs', go: 'go', java: 'java', swift: 'swift', kotlin: 'kt', sql: 'sql', css: 'css', html: 'html', json: 'json', xml: 'xml', yaml: 'yml', markdown: 'md', shell: 'sh', bash: 'sh', ruby: 'rb', php: 'php', csharp: 'cs', cpp: 'cpp' };
+    const ext = extMap[lang] || lang;
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `code.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    downloadBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(() => {
+      downloadBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    }, 1500);
     return;
   }
 
