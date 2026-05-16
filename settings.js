@@ -100,3 +100,19 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 });
 
 loadSettings();
+
+let ticking = false;
+document.addEventListener('mousemove', (e) => {
+  if (!ticking) {
+    requestAnimationFrame(() => {
+      const card = e.target.closest('.bento-card');
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+        card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+      }
+      ticking = false;
+    });
+    ticking = true;
+  }
+});

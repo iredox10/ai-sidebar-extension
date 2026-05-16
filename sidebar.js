@@ -246,12 +246,17 @@ function enhanceCodeBlocks(html) {
       : '';
     wrap.innerHTML = `
       <div class="cb-header">
-        <div class="cb-header-left">${leftHeader}</div>
+        <div class="cb-header-left">
+          <div class="mac-traffic-lights"><span class="mac-close"></span><span class="mac-min"></span><span class="mac-max"></span></div>
+          ${leftHeader}
+        </div>
         <div class="cb-header-right">
           <button class="cb-wrap-toggle" title="Toggle word wrap">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 11h10"/><path d="M4 15h6"/><path d="M4 19h14"/></svg>
           </button>
-          <button class="cb-copy">Copy</button>
+          <button class="cb-copy" title="Copy code">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+          </button>
         </div>
       </div>
       <pre><code>${codeHtml}</code></pre>
@@ -300,12 +305,17 @@ document.addEventListener('click', (e) => {
     const code = wrap.querySelector('code')?.textContent;
     if (!code) return;
     navigator.clipboard.writeText(code).then(() => {
-      copyBtn.textContent = 'Copied!';
+      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
       copyBtn.classList.add('copied');
-      setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 2000);
+      setTimeout(() => { 
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>'; 
+        copyBtn.classList.remove('copied'); 
+      }, 2000);
     }).catch(() => {
-      copyBtn.textContent = 'Failed';
-      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+      setTimeout(() => { 
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>'; 
+      }, 2000);
     });
     return;
   }
@@ -724,9 +734,20 @@ function showEmptyState() {
 
 function showTyping() {
   const div = document.createElement('div');
-  div.className = 'msg-group ai';
+  div.className = 'message ai';
   div.id = 'typingIndicator';
-  div.innerHTML = `<div class="msg-meta">AI</div><div class="msg-bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+  div.innerHTML = `
+    <div class="msg-meta">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 2s linear infinite;"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+      AI is thinking...
+    </div>
+    <div class="msg-bubble" style="background:transparent; padding:0; border:none; width:100%;">
+      <div class="skeleton-loader">
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line short"></div>
+      </div>
+    </div>`;
   chatArea.appendChild(div);
   scrollToBottom();
 }
@@ -809,3 +830,19 @@ function updateModels() {
 }
 
 init();
+
+let ticking = false;
+document.addEventListener('mousemove', (e) => {
+  if (!ticking) {
+    requestAnimationFrame(() => {
+      const card = e.target.closest('.input-island, .cb-wrap');
+      if (card) {
+        const rect = card.getBoundingClientRect();
+        card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+        card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+      }
+      ticking = false;
+    });
+    ticking = true;
+  }
+});
