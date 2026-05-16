@@ -768,10 +768,22 @@ input, textarea, select { font-family: var(--font-sans); outline: none; }
   flex-shrink: 0;
 }
 .vim-indicator.normal {
-  color: #22c55e; background: rgba(34,197,94,0.1);
+  color: #22c55e; background: rgba(34,197,94,0.12);
 }
 .vim-indicator.insert {
-  color: #60a5fa; background: rgba(96,165,250,0.1);
+  color: #60a5fa; background: rgba(96,165,250,0.12);
+}
+.vim-indicator.visual {
+  color: #c084fc; background: rgba(192,132,252,0.12);
+}
+
+/* ── Visual Mode Selection ── */
+.message.vim-visual {
+  position: relative;
+  outline: 2px solid rgba(192,132,252,0.5);
+  outline-offset: 1px;
+  border-radius: var(--radius-md);
+  transition: outline-color 0.15s;
 }
 
 /* ── Vim Help Overlay ── */

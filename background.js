@@ -23,7 +23,28 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'focus-sidebar') {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0]) {
+      await chrome.sidePanel.open({ windowId: tabs[0].windowId });
+    }
+    chrome.runtime.sendMessage({ type: 'focus-sidebar-input' });
+  }
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'focus-page') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.windows.update(tabs[0].windowId, { focused: true });
+        chrome.tabs.sendMessage(tabs[0].id, { type: 'focus-page' });
+      }
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+
   if (request.type === 'ask-ai') {
     chrome.storage.local.set({ selectedText: request.text }, () => {
       chrome.sidePanel.open({ windowId: sender.tab.windowId });

@@ -34,7 +34,7 @@
     <button class="icon-btn" id="newChatBtn" title="New Chat">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
     </button>
-    <div class="vim-indicator" id="vimIndicator">NORMAL</div>
+    <div class="vim-indicator" id="vimIndicator">N</div>
   </header>
 
   <!-- Main Chat Flow -->
@@ -153,13 +153,27 @@
         </div>
         <div class="vim-help-section">
           <div class="vim-help-section-title">Modes</div>
-          <div class="vim-help-row"><kbd>i</kbd><span>Enter insert mode (focus input)</span></div>
-          <div class="vim-help-row"><kbd>Esc</kbd><span>Enter normal mode</span></div>
+          <div class="vim-help-row"><kbd>i</kbd><span>Insert mode (<b>I</b> — focus input)</span></div>
+          <div class="vim-help-row"><kbd>v</kbd><span>Visual mode (<b>V</b> — select messages)</span></div>
+          <div class="vim-help-row"><kbd>Esc</kbd><span>Normal mode (<b>N</b>) / close panels</span></div>
+        </div>
+        <div class="vim-help-section">
+          <div class="vim-help-section-title">Visual Mode</div>
+          <div class="vim-help-row"><kbd>j</kbd><span>Select next message</span></div>
+          <div class="vim-help-row"><kbd>k</kbd><span>Select previous message</span></div>
+          <div class="vim-help-row"><kbd>q</kbd><span>Quote selected message</span></div>
+          <div class="vim-help-row"><kbd>y</kbd><span>Copy selected message text</span></div>
         </div>
         <div class="vim-help-section">
           <div class="vim-help-section-title">Actions</div>
+          <div class="vim-help-row"><kbd>q</kbd><span>Switch focus to web page</span></div>
           <div class="vim-help-row"><kbd>H</kbd><span>Toggle history panel</span></div>
           <div class="vim-help-row"><kbd>?</kbd><span>Show this help</span></div>
+        </div>
+        <div class="vim-help-section">
+          <div class="vim-help-section-title">Browser Shortcuts</div>
+          <div class="vim-help-row"><kbd>Ctrl+Shift+E</kbd><span>Focus sidebar input</span></div>
+          <div class="vim-help-row"><kbd>Ctrl+B</kbd><span>Toggle sidebar (Chrome)</span></div>
         </div>
       </div>
     </div>

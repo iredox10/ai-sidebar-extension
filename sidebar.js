@@ -478,6 +478,17 @@ async function init() {
 
   if (!messages.length) showEmptyState();
   ready = true;
+  setVimMode('normal');
+
+  chrome.runtime.onMessage.addListener((request) => {
+    if (request.type === 'focus-sidebar-input') {
+      messageInput.focus();
+      setVimMode('insert');
+    }
+    if (request.type === 'focus-page') {
+      window.blur();
+    }
+  });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.selectedText && ready) {
@@ -1563,8 +1574,10 @@ const vimHelpOverlay = document.getElementById('vimHelpOverlay');
 
 function setVimMode(mode) {
   vimMode = mode;
-  vimIndicator.textContent = mode === 'normal' ? 'NORMAL' : 'INSERT';
+  const labels = { normal: 'N', insert: 'I', visual: 'V' };
+  vimIndicator.textContent = labels[mode] || 'N';
   vimIndicator.className = `vim-indicator ${mode}`;
+  if (mode !== 'visual') clearVisualSelection();
 }
 
 function vimScrollChat(amount) {
@@ -1578,39 +1591,117 @@ function toggleVimHelp() {
   vimHelpOverlay.style.display = isOpen ? 'none' : 'flex';
 }
 
+// ---- Visual Mode ----
+
+let vimMessages = [];
+let vimVisualIndex = -1;
+
+function clearVisualSelection() {
+  chatArea.querySelectorAll('.message.vim-visual').forEach(el => el.classList.remove('vim-visual'));
+  vimVisualIndex = -1;
+}
+
+function refreshVimMessages() {
+  vimMessages = Array.from(chatArea.querySelectorAll('.message'));
+}
+
+function selectVimMessage(index) {
+  clearVisualSelection();
+  vimVisualIndex = Math.max(0, Math.min(index, vimMessages.length - 1));
+  const el = vimMessages[vimVisualIndex];
+  if (!el) { vimVisualIndex = -1; return; }
+  el.classList.add('vim-visual');
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function getVimSelectedText() {
+  const el = vimMessages[vimVisualIndex];
+  if (!el) return '';
+  const bubble = el.querySelector('.msg-bubble');
+  return bubble ? bubble.textContent.trim() : '';
+}
+
+const visualBindings = {
+  j() {
+    refreshVimMessages();
+    if (vimMessages.length === 0) return;
+    const next = vimVisualIndex < 0 ? 0 : Math.min(vimVisualIndex + 1, vimMessages.length - 1);
+    selectVimMessage(next);
+  },
+  k() {
+    refreshVimMessages();
+    if (vimMessages.length === 0) return;
+    const prev = vimVisualIndex < 0 ? vimMessages.length - 1 : Math.max(vimVisualIndex - 1, 0);
+    selectVimMessage(prev);
+  },
+  q() {
+    const text = getVimSelectedText();
+    if (text) {
+      quoteText = text;
+      renderQuotePreview();
+      messageInput.focus();
+      setVimMode('insert');
+    }
+  },
+  y() {
+    const text = getVimSelectedText();
+    if (text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard');
+      });
+      setVimMode('normal');
+    }
+  },
+};
+
+// ---- Keydown Handler ----
+
 document.addEventListener('keydown', (e) => {
   const tag = e.target.tagName;
   const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable;
 
-  if (isInput && e.key === 'Escape') {
-    e.target.blur();
-    setVimMode('normal');
-    e.preventDefault();
+  if (e.key === 'Escape') {
+    if (isInput) {
+      e.target.blur();
+      setVimMode('normal');
+      e.preventDefault();
+      return;
+    }
+    if (historyOpen) { closeHistory(); e.preventDefault(); return; }
+    if (contextMenu.classList.contains('open')) { hideContextMenu(); e.preventDefault(); return; }
+    hideSelToolbar();
+    if (vimMode === 'visual') { setVimMode('normal'); e.preventDefault(); return; }
     return;
   }
 
   if (isInput) return;
-  if (vimMode !== 'normal') return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-  const key = e.key;
+  if (vimMode === 'normal') {
+    const key = e.key;
 
-  if (vimPartial === 'g') {
-    clearTimeout(vimPartialTimer);
-    vimPartial = '';
-    if (key === 'g') { vimScrollChat('top'); e.preventDefault(); return; }
+    if (vimPartial === 'g') {
+      clearTimeout(vimPartialTimer);
+      vimPartial = '';
+      if (key === 'g') { vimScrollChat('top'); e.preventDefault(); return; }
+      const cmd = vimBindings[key];
+      if (cmd) { cmd(); e.preventDefault(); }
+      return;
+    }
+
     const cmd = vimBindings[key];
-    if (cmd) { cmd(); e.preventDefault(); }
-    return;
+    if (cmd) { cmd(); e.preventDefault(); return; }
+
+    if (key === 'g') {
+      vimPartial = 'g';
+      vimPartialTimer = setTimeout(() => { vimPartial = ''; }, 500);
+      e.preventDefault();
+    }
   }
 
-  const cmd = vimBindings[key];
-  if (cmd) { cmd(); e.preventDefault(); return; }
-
-  if (key === 'g') {
-    vimPartial = 'g';
-    vimPartialTimer = setTimeout(() => { vimPartial = ''; }, 500);
-    e.preventDefault();
+  if (vimMode === 'visual') {
+    const cmd = visualBindings[e.key];
+    if (cmd) { cmd(); e.preventDefault(); }
   }
 });
 
@@ -1621,7 +1712,14 @@ const vimBindings = {
   u() { vimScrollChat(-(chatArea.clientHeight * 0.5)); },
   G() { vimScrollChat('bottom'); },
   i() { setVimMode('insert'); messageInput.focus(); },
+  v() {
+    refreshVimMessages();
+    if (vimMessages.length === 0) return;
+    selectVimMessage(vimMessages.length - 1);
+    setVimMode('visual');
+  },
   H() { toggleHistory(); },
+  q() { chrome.runtime.sendMessage({ type: 'focus-page' }); },
   '?': toggleVimHelp,
 };
 
