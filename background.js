@@ -67,8 +67,22 @@ async function handleChat(request, sendResponse) {
 
     sendResponse({ ok: true, data: result });
   } catch (err) {
-    sendResponse({ ok: false, error: err.message });
+    const msg = err.message || '';
+    if (msg.toLowerCase().includes('image') && (msg.toLowerCase().includes('not support') || msg.toLowerCase().includes('clipboard') || msg.toLowerCase().includes('vision'))) {
+      sendResponse({ ok: false, error: `"${request.model}" does not support image input. Switch to a vision-capable model (e.g. GPT-4o, Claude Sonnet, Gemini Flash) or send a text-only message.` });
+    } else {
+      sendResponse({ ok: false, error: msg });
+    }
   }
+}
+
+function toOpenAIContent(content) {
+  if (typeof content === 'string') return content;
+  return content.map(p => {
+    if (p.type === 'text') return { type: 'text', text: p.text };
+    if (p.type === 'image') return { type: 'image_url', image_url: { url: `data:${p.mimeType};base64,${p.data}` } };
+    return { type: 'text', text: '' };
+  });
 }
 
 async function callOpenAI(apiKey, model, systemPrompt, messages, temperature) {
@@ -78,7 +92,7 @@ async function callOpenAI(apiKey, model, systemPrompt, messages, temperature) {
     model,
     messages: [
       { role: 'system', content: systemPrompt },
-      ...messages.map(m => ({ role: m.role, content: m.content }))
+      ...messages.map(m => ({ role: m.role, content: toOpenAIContent(m.content) }))
     ],
     temperature,
     stream: false
@@ -106,13 +120,22 @@ async function callOpenAI(apiKey, model, systemPrompt, messages, temperature) {
   };
 }
 
+function toAnthropicContent(content) {
+  if (typeof content === 'string') return content;
+  return content.map(p => {
+    if (p.type === 'text') return { type: 'text', text: p.text };
+    if (p.type === 'image') return { type: 'image', source: { type: 'base64', media_type: p.mimeType, data: p.data } };
+    return { type: 'text', text: '' };
+  });
+}
+
 async function callAnthropic(apiKey, model, systemPrompt, messages, temperature) {
   if (!apiKey) throw new Error('Anthropic API key not configured');
 
   const body = {
     model,
     system: systemPrompt,
-    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    messages: messages.map(m => ({ role: m.role, content: toAnthropicContent(m.content) })),
     max_tokens: 4096,
     temperature
   };
@@ -133,11 +156,30 @@ async function callAnthropic(apiKey, model, systemPrompt, messages, temperature)
   }
 
   const data = await res.json();
+
+  let text = '';
+  if (Array.isArray(data.content)) {
+    for (const block of data.content) {
+      if (block.type === 'text') text += block.text;
+    }
+  } else {
+    text = data.content?.[0]?.text || '';
+  }
+
   return {
-    content: data.content[0].text,
+    content: text,
     model: data.model,
     usage: data.usage
   };
+}
+
+function toGoogleParts(content) {
+  if (typeof content === 'string') return [{ text: content }];
+  return content.map(p => {
+    if (p.type === 'text') return { text: p.text };
+    if (p.type === 'image') return { inlineData: { mimeType: p.mimeType, data: p.data } };
+    return { text: '' };
+  });
 }
 
 async function callGoogle(apiKey, model, systemPrompt, messages, temperature) {
@@ -147,7 +189,7 @@ async function callGoogle(apiKey, model, systemPrompt, messages, temperature) {
   for (const m of messages) {
     contents.push({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
+      parts: toGoogleParts(m.content)
     });
   }
 
@@ -178,8 +220,14 @@ async function callGoogle(apiKey, model, systemPrompt, messages, temperature) {
   }
 
   const data = await res.json();
+  let text = '';
+  if (data.candidates?.[0]?.content?.parts) {
+    for (const part of data.candidates[0].content.parts) {
+      if (part.text) text += part.text;
+    }
+  }
   return {
-    content: data.candidates[0].content.parts[0].text,
+    content: text || '',
     model: model,
     usage: null
   };

@@ -16,6 +16,10 @@ const historySearchClear = document.getElementById('historySearchClear');
 const historyResizeHandle = document.getElementById('historyResizeHandle');
 const contextMenu = document.getElementById('contextMenu');
 const historyCount = document.getElementById('historyCount');
+const attachBtn = document.getElementById('attachBtn');
+const fileInput = document.getElementById('fileInput');
+const attachBar = document.getElementById('attachBar');
+const attachList = document.getElementById('attachList');
 
 const modelDropdown = document.getElementById('modelDropdown');
 const modelToggle = document.getElementById('modelToggle');
@@ -25,25 +29,32 @@ const activeModelName = document.getElementById('activeModelName');
 
 const modelsByProvider = {
   openai: [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { value: 'o3-mini', label: 'o3 Mini' },
+    { value: 'gpt-4o', label: 'GPT-4o', vision: true },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini', vision: true },
+    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', vision: true },
+    { value: 'o3-mini', label: 'o3 Mini', vision: false },
   ],
   anthropic: [
-    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
-    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', vision: true },
+    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', vision: true },
+    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', vision: true },
+    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4', vision: true },
   ],
   google: [
-    { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
-    { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', vision: true },
+    { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', vision: true },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', vision: true },
+    { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', vision: true },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', vision: true },
   ],
 };
+
+function currentModelHasVision() {
+  const p = providerSelect.value;
+  const m = modelSelect.value;
+  const model = modelsByProvider[p]?.find(x => x.value === m);
+  return model ? model.vision !== false : true;
+}
 
 const providerIcons = {
   openai: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 11.2a7.13 7.13 0 0 0-1.8-6.17 7.08 7.08 0 0 0-6.14-1.8 7.12 7.12 0 0 0-11 5.4 7.1 7.1 0 0 0 1.8 6.16 7.1 7.1 0 0 0 6.14 1.8 7.1 7.1 0 0 0 11-5.4zm-9.87-8.12a5 5 0 0 1 4 2.1l-6 3.4v-6.9a5.1 5.1 0 0 1 2-1.4zm-7 2.62a5 5 0 0 1 2.3-1.6v6.8l-5.9 3.4a5 5 0 0 1 3.6-8.6zm-1.8 11.4a5 5 0 0 1-1.3-4.1l6-3.4v6.8l-4.7 2.7zm7 2.62a5 5 0 0 1-4-2.1l6-3.4v6.9a5.1 5.1 0 0 1-2 1.4zm7-2.62a5 5 0 0 1-2.3 1.6v-6.8l5.9-3.4a5 5 0 0 1-3.6 8.6zm1.8-11.4a5 5 0 0 1 1.3 4.1l-6 3.4v-6.8l4.7-2.7z"/></svg>',
@@ -57,6 +68,8 @@ let isProcessing = false;
 let historyOpen = false;
 let lastSentText = '';
 let ready = false;
+let attachments = [];
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 const languageNames = {
   js: 'JavaScript', javascript: 'JavaScript', jsx: 'JSX',
@@ -373,6 +386,7 @@ async function init() {
   if (settings.model) modelSelect.value = settings.model;
   
   updateModels();
+  updateAttachButton();
   
   const currentProvider = providerSelect.value;
   const currentModel = modelSelect.value;
@@ -391,6 +405,12 @@ async function init() {
   });
   sendBtn.addEventListener('click', sendMessage);
   newChatBtn.addEventListener('click', newChat);
+
+  attachBtn.addEventListener('click', () => {
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', handleFiles);
+  updateAttachButton();
   settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
   modelToggle.addEventListener('click', (e) => {
@@ -531,6 +551,7 @@ async function newChat() {
     await saveCurrentChat();
   }
   if (historyOpen) closeHistory();
+  clearAttachments();
   createNewChat();
   messages = [];
   await chrome.storage.local.set({ active_chat_id: activeChatId });
@@ -546,6 +567,7 @@ function updateModelBar() {
     if (chat.provider) providerSelect.value = chat.provider;
     if (chat.model) modelSelect.value = chat.model;
     updateModels();
+    updateAttachButton();
     const modelObj = modelsByProvider[providerSelect.value]?.find(m => m.value === modelSelect.value) || modelsByProvider.openai[0];
     if (modelObj) {
       updateActiveDisplay(providerSelect.value, modelObj.label);
@@ -935,14 +957,18 @@ function initHistorySearch() {
 
 let messages = [];
 
-function addMessage(role, content) {
-  messages.push({ role, content });
-  appendMessage(role, content);
+function addMessage(role, content, msgAttachments = null) {
+  const msg = { role, content };
+  if (msgAttachments && msgAttachments.length > 0) {
+    msg.attachments = msgAttachments.map(a => ({ ...a }));
+  }
+  messages.push(msg);
+  appendMessage(role, content, msg.attachments);
   scrollToBottom();
   saveCurrentChat();
 }
 
-function appendMessage(role, content) {
+function appendMessage(role, content, msgAttachments = null) {
   const div = document.createElement('div');
   const isUser = role === 'user';
   div.className = `message ${isUser ? 'user' : 'ai'}`;
@@ -964,6 +990,27 @@ function appendMessage(role, content) {
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
   bubble.innerHTML = renderMarkdown(content);
+
+  if (msgAttachments && msgAttachments.length > 0) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-attach-grid';
+    for (const a of msgAttachments) {
+      if (a.isImage) {
+        const img = document.createElement('img');
+        img.src = `data:${a.mimeType};base64,${a.data}`;
+        img.className = 'msg-attach-img';
+        img.alt = a.name;
+        img.loading = 'lazy';
+        wrap.appendChild(img);
+      } else {
+        const chip = document.createElement('div');
+        chip.className = 'msg-attach-file';
+        chip.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>${escapeHtml(a.name)}</span>`;
+        wrap.appendChild(chip);
+      }
+    }
+    bubble.prepend(wrap);
+  }
 
   div.appendChild(meta);
   div.appendChild(bubble);
@@ -990,7 +1037,7 @@ function renderMessages() {
   chatArea.innerHTML = '';
   messages.forEach(msg => {
     if (msg.role === 'system') return;
-    appendMessage(msg.role, msg.content);
+    appendMessage(msg.role, msg.content, msg.attachments);
   });
 }
 
@@ -1112,18 +1159,39 @@ async function sendMessage() {
   }
 
   const text = messageInput.value.trim();
-  if (!text) return;
-
+  if (!text && attachments.length === 0) return;
   if (historyOpen) closeHistory();
 
   lastSentText = text;
   messageInput.value = '';
   messageInput.style.height = 'auto';
 
+  const apiContent = buildApiContent(text);
+  const isMultiPart = Array.isArray(apiContent);
+
+  const displayText = text;
+
   const lastError = chatArea.querySelector('.error-msg:last-child');
   if (lastError) lastError.remove();
 
-  addMessage('user', text);
+  addMessage('user', displayText, attachments.length > 0 ? [...attachments] : null);
+
+  if (isMultiPart) {
+    const hasVision = currentModelHasVision();
+    const hasImageParts = apiContent.some(p => p.type === 'image');
+    if (!hasVision && hasImageParts) {
+      hideTyping();
+      isProcessing = false;
+      sendBtn.classList.remove('processing');
+      clearAttachments();
+      showToast(`${modelSelect.value} doesn't support images. Image was skipped. Switch to a vision model (e.g. GPT-4o, Claude Sonnet).`);
+      messageInput.focus();
+      return;
+    }
+  }
+
+  const apiMessages = messages.filter(m => m.role !== 'system').map(m => ({ ...m }));
+  if (isMultiPart) apiMessages[apiMessages.length - 1].content = apiContent;
 
   isProcessing = true;
   sendBtn.classList.add('processing');
@@ -1137,7 +1205,7 @@ async function sendMessage() {
         type: 'chat',
         provider: providerSelect.value,
         model: modelSelect.value,
-        messages: messages.filter(m => m.role !== 'system')
+        messages: apiMessages
       }),
       new Promise((_, reject) => {
         abortController.signal.addEventListener('abort', () => reject(new Error('Aborted')));
@@ -1145,15 +1213,28 @@ async function sendMessage() {
     ]);
 
     hideTyping();
+    clearAttachments();
 
     if (result.ok) {
       addMessage('assistant', result.data.content);
     } else {
-      showError(result.error || 'Request failed');
+      const errMsg = result.error || 'Request failed';
+      if (/image|vision|clipboard/i.test(errMsg) && /not support/i.test(errMsg)) {
+        showToast(`${modelSelect.value} doesn't support image input. Switch to GPT-4o, Claude Sonnet, or Gemini Flash.`);
+      } else {
+        showError(errMsg);
+      }
     }
   } catch (err) {
     hideTyping();
-    if (err.message !== 'Aborted') showError(err.message || 'Connection failed');
+    const errMsg = err.message || '';
+    if (errMsg !== 'Aborted') {
+      if (/image|vision|clipboard/i.test(errMsg) && /not support/i.test(errMsg)) {
+        showToast(`${modelSelect.value} doesn't support image input. Switch to a vision-capable model.`);
+      } else {
+        showError(errMsg);
+      }
+    }
   } finally {
     isProcessing = false;
     sendBtn.classList.remove('processing');
@@ -1166,6 +1247,151 @@ function autoResizeInput() {
     messageInput.style.height = 'auto';
     messageInput.style.height = Math.min(messageInput.scrollHeight, 100) + 'px';
   });
+}
+
+// ---- Attachments ----
+
+function handleFiles(e) {
+  const files = Array.from(e.target.files);
+  e.target.value = '';
+  if (!files.length) return;
+  const hasVision = currentModelHasVision();
+
+  for (const file of files) {
+    if (file.size > MAX_FILE_SIZE) {
+      showError(`${file.name} exceeds 20MB limit`);
+      continue;
+    }
+    const isImage = file.type.startsWith('image/');
+    if (isImage && !hasVision) {
+      showToast(`${modelSelect.value} doesn't support images. "${file.name}" was skipped.`);
+      continue;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = isImage ? ev.target.result.split(',')[1] : ev.target.result;
+      attachments.push({
+        id: generateId(),
+        name: file.name,
+        size: file.size,
+        mimeType: file.type || (isImage ? 'image/png' : 'text/plain'),
+        data,
+        isImage,
+      });
+      renderAttachments();
+    };
+    if (isImage) reader.readAsDataURL(file);
+    else reader.readAsText(file);
+  }
+}
+
+function updateAttachButton() {
+  const hasVision = currentModelHasVision();
+  const hasOnlyTextFiles = attachments.length > 0 && attachments.every(a => !a.isImage);
+  const canAttach = hasVision || hasOnlyTextFiles;
+  attachBtn.style.opacity = canAttach ? '1' : '0.35';
+  attachBtn.title = !hasVision && attachments.some(a => a.isImage)
+    ? 'Switch to a vision-capable model to send images'
+    : !hasVision
+    ? 'Attach text files only (model does not support images)'
+    : 'Add files';
+}
+
+function renderAttachments() {
+  if (attachments.length === 0) {
+    attachBar.style.display = 'none';
+    return;
+  }
+  attachBar.style.display = 'block';
+
+  const hasVision = currentModelHasVision();
+  const hasImages = attachments.some(a => a.isImage);
+  const warning = !hasVision && hasImages;
+
+  attachList.innerHTML = (warning
+    ? `<div class="attach-warning">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        ${modelSelect.value} does not support images. Image attachments will be skipped on send.
+      </div>`
+    : ''
+  ) + attachments.map(a => {
+    const icon = a.isImage
+      ? `<img class="attach-chip-thumb" src="data:${a.mimeType};base64,${a.data}" alt="">`
+      : `<svg class="attach-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+    const dimmed = !hasVision && a.isImage;
+    return `<div class="attach-chip${dimmed ? ' dimmed' : ''}" data-id="${a.id}">
+      ${icon}
+      <span class="attach-chip-name">${escapeHtml(a.name)}</span>
+      <button class="attach-chip-remove" data-id="${a.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>`;
+  }).join('');
+
+  attachList.querySelectorAll('.attach-chip-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      attachments = attachments.filter(a => a.id !== btn.dataset.id);
+      renderAttachments();
+    });
+  });
+  updateAttachButton();
+}
+
+function renderMessageAttachments() {
+  if (!attachments.length) return;
+  const lastMsg = chatArea.querySelector('.message.user:last-child .msg-bubble');
+  if (!lastMsg) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-attach-grid';
+  for (const a of attachments) {
+    if (a.isImage) {
+      const img = document.createElement('img');
+      img.src = `data:${a.mimeType};base64,${a.data}`;
+      img.className = 'msg-attach-img';
+      img.alt = a.name;
+      img.loading = 'lazy';
+      wrap.appendChild(img);
+    } else {
+      const chip = document.createElement('div');
+      chip.className = 'msg-attach-file';
+      chip.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>${escapeHtml(a.name)}</span>`;
+      wrap.appendChild(chip);
+    }
+  }
+  lastMsg.prepend(wrap);
+}
+
+function clearAttachments() {
+  attachments = [];
+  attachBar.style.display = 'none';
+  attachList.innerHTML = '';
+  updateAttachButton();
+}
+
+function showToast(msg, type = 'warning') {
+  const existing = document.querySelector('.toast-msg');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast-msg';
+  el.innerHTML = `<span>${escapeHtml(msg)}</span>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('open'));
+  setTimeout(() => { el.classList.remove('open'); setTimeout(() => el.remove(), 200); }, 3500);
+}
+
+// ---- Build API content with attachments ----
+
+function buildApiContent(text) {
+  if (attachments.length === 0) return text;
+  const hasVision = currentModelHasVision();
+  const parts = [{ type: 'text', text: text || 'Analyze the attached files.' }];
+  for (const a of attachments) {
+    if (a.isImage) {
+      if (!hasVision) continue;
+      parts.push({ type: 'image', mimeType: a.mimeType, data: a.data });
+    } else {
+      parts.push({ type: 'text', text: `\n--- File: ${a.name} ---\n${a.data}\n--- End ${a.name} ---\n` });
+    }
+  }
+  return parts;
 }
 
 function updateModels() {
@@ -1181,14 +1407,17 @@ function updateModels() {
     models.forEach(m => {
       const item = document.createElement('div');
       item.className = `select-item ${m.value === selectedModelVal ? 'active' : ''}`;
-      item.innerHTML = `${providerIcons[provider]} ${m.label}`;
+      const visionBadge = m.vision !== false ? '' : '<span class="model-no-vision">text</span>';
+      item.innerHTML = `${providerIcons[provider]} ${m.label} ${visionBadge}`;
       item.addEventListener('click', () => {
         modelSelect.value = m.value;
         providerSelect.value = provider;
         chrome.storage.sync.set({ provider: provider, model: m.value });
         modelDropdown.classList.remove('open');
         updateActiveDisplay(provider, m.label);
-        updateModels(); // Re-render to update active class
+        updateModels();
+        updateAttachButton();
+        renderAttachments();
       });
       modelMenu.appendChild(item);
     });
