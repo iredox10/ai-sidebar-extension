@@ -12,6 +12,12 @@ const historyClose = document.getElementById('historyClose');
 const historyList = document.getElementById('historyList');
 const historyNewBtn = document.getElementById('historyNewBtn');
 
+const modelDropdown = document.getElementById('modelDropdown');
+const modelToggle = document.getElementById('modelToggle');
+const modelMenu = document.getElementById('modelMenu');
+const activeModelIcon = document.getElementById('activeModelIcon');
+const activeModelName = document.getElementById('activeModelName');
+
 const modelsByProvider = {
   openai: [
     { value: 'gpt-4o', label: 'GPT-4o' },
@@ -32,6 +38,12 @@ const modelsByProvider = {
     { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
     { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
   ],
+};
+
+const providerIcons = {
+  openai: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 11.2a7.13 7.13 0 0 0-1.8-6.17 7.08 7.08 0 0 0-6.14-1.8 7.12 7.12 0 0 0-11 5.4 7.1 7.1 0 0 0 1.8 6.16 7.1 7.1 0 0 0 6.14 1.8 7.1 7.1 0 0 0 11-5.4zm-9.87-8.12a5 5 0 0 1 4 2.1l-6 3.4v-6.9a5.1 5.1 0 0 1 2-1.4zm-7 2.62a5 5 0 0 1 2.3-1.6v6.8l-5.9 3.4a5 5 0 0 1 3.6-8.6zm-1.8 11.4a5 5 0 0 1-1.3-4.1l6-3.4v6.8l-4.7 2.7zm7 2.62a5 5 0 0 1-4-2.1l6-3.4v6.9a5.1 5.1 0 0 1-2 1.4zm7-2.62a5 5 0 0 1-2.3 1.6v-6.8l5.9-3.4a5 5 0 0 1-3.6 8.6zm1.8-11.4a5 5 0 0 1 1.3 4.1l-6 3.4v-6.8l4.7-2.7z"/></svg>',
+  anthropic: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg>',
+  google: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg>'
 };
 
 let activeChatId = null;
@@ -353,21 +365,18 @@ async function init() {
 
   const settings = await chrome.storage.sync.get(['provider', 'model']);
   if (settings.provider) providerSelect.value = settings.provider;
-  if (settings.model) {
-    updateModels();
-    const exists = Array.from(modelSelect.options).some(o => o.value === settings.model);
-    if (exists) modelSelect.value = settings.model;
-  } else {
-    updateModels();
+  if (settings.model) modelSelect.value = settings.model;
+  
+  updateModels();
+  
+  const currentProvider = providerSelect.value;
+  const currentModel = modelSelect.value;
+  const modelObj = modelsByProvider[currentProvider]?.find(m => m.value === currentModel) || modelsByProvider.openai[0];
+  
+  if (modelObj) {
+    modelSelect.value = modelObj.value;
+    updateActiveDisplay(currentProvider, modelObj.label);
   }
-
-  providerSelect.addEventListener('change', () => {
-    updateModels();
-    chrome.storage.sync.set({ provider: providerSelect.value, model: modelSelect.value });
-  });
-  modelSelect.addEventListener('change', () => {
-    chrome.storage.sync.set({ model: modelSelect.value });
-  });
 
   messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -378,6 +387,14 @@ async function init() {
   sendBtn.addEventListener('click', sendMessage);
   newChatBtn.addEventListener('click', newChat);
   settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+  modelToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    modelDropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!modelDropdown.contains(e.target)) modelDropdown.classList.remove('open');
+  });
 
   historyToggle.addEventListener('click', toggleHistory);
   historyClose.addEventListener('click', closeHistory);
@@ -543,10 +560,11 @@ function updateModelBar() {
   const chat = getActiveChat();
   if (chat) {
     if (chat.provider) providerSelect.value = chat.provider;
+    if (chat.model) modelSelect.value = chat.model;
     updateModels();
-    if (chat.model) {
-      const exists = Array.from(modelSelect.options).some(o => o.value === chat.model);
-      if (exists) modelSelect.value = chat.model;
+    const modelObj = modelsByProvider[providerSelect.value]?.find(m => m.value === modelSelect.value) || modelsByProvider.openai[0];
+    if (modelObj) {
+      updateActiveDisplay(providerSelect.value, modelObj.label);
     }
   }
 }
@@ -666,12 +684,22 @@ function addMessage(role, content) {
 
 function appendMessage(role, content) {
   const div = document.createElement('div');
-  div.className = `msg-group ${role}`;
   const isUser = role === 'user';
+  div.className = `message ${isUser ? 'user' : 'ai'}`;
 
   const meta = document.createElement('div');
   meta.className = 'msg-meta';
-  meta.textContent = isUser ? 'You' : 'AI';
+  
+  if (isUser) {
+    meta.innerHTML = `<div class="avatar user-avatar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div> You`;
+  } else {
+    const provider = providerSelect.value;
+    const modelVal = modelSelect.value;
+    const modelObj = modelsByProvider[provider]?.find(m => m.value === modelVal);
+    const modelName = modelObj ? modelObj.label : 'AI';
+    const icon = providerIcons[provider] || providerIcons.openai;
+    meta.innerHTML = `<div class="avatar ai-avatar">${icon}</div> ${modelName}`;
+  }
 
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
@@ -738,8 +766,10 @@ function showTyping() {
   div.id = 'typingIndicator';
   div.innerHTML = `
     <div class="msg-meta">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 2s linear infinite;"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
-      AI is thinking...
+      <div class="avatar ai-avatar">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 2s linear infinite;"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+      </div>
+      Thinking...
     </div>
     <div class="msg-bubble" style="background:transparent; padding:0; border:none; width:100%;">
       <div class="skeleton-loader">
@@ -772,9 +802,19 @@ function showError(errorMsg) {
   scrollToBottom();
 }
 
+let abortController = null;
+
 async function sendMessage() {
+  if (isProcessing) {
+    if (abortController) abortController.abort();
+    isProcessing = false;
+    sendBtn.classList.remove('processing');
+    hideTyping();
+    return;
+  }
+
   const text = messageInput.value.trim();
-  if (!text || isProcessing) return;
+  if (!text) return;
 
   if (historyOpen) closeHistory();
 
@@ -788,16 +828,23 @@ async function sendMessage() {
   addMessage('user', text);
 
   isProcessing = true;
-  sendBtn.disabled = true;
+  sendBtn.classList.add('processing');
   showTyping();
 
+  abortController = new AbortController();
+
   try {
-    const result = await chrome.runtime.sendMessage({
-      type: 'chat',
-      provider: providerSelect.value,
-      model: modelSelect.value,
-      messages: messages.filter(m => m.role !== 'system')
-    });
+    const result = await Promise.race([
+      chrome.runtime.sendMessage({
+        type: 'chat',
+        provider: providerSelect.value,
+        model: modelSelect.value,
+        messages: messages.filter(m => m.role !== 'system')
+      }),
+      new Promise((_, reject) => {
+        abortController.signal.addEventListener('abort', () => reject(new Error('Aborted')));
+      })
+    ]);
 
     hideTyping();
 
@@ -808,10 +855,10 @@ async function sendMessage() {
     }
   } catch (err) {
     hideTyping();
-    showError(err.message || 'Connection failed');
+    if (err.message !== 'Aborted') showError(err.message || 'Connection failed');
   } finally {
     isProcessing = false;
-    sendBtn.disabled = false;
+    sendBtn.classList.remove('processing');
     messageInput.focus();
   }
 }
@@ -824,9 +871,35 @@ function autoResizeInput() {
 }
 
 function updateModels() {
-  const provider = providerSelect.value;
-  const models = modelsByProvider[provider] || modelsByProvider.openai;
-  modelSelect.innerHTML = models.map(m => `<option value="${m.value}">${m.label}</option>`).join('');
+  const selectedModelVal = modelSelect.value;
+  modelMenu.innerHTML = '';
+  
+  for (const [provider, models] of Object.entries(modelsByProvider)) {
+    const group = document.createElement('div');
+    group.className = 'select-item-group';
+    group.textContent = provider;
+    modelMenu.appendChild(group);
+
+    models.forEach(m => {
+      const item = document.createElement('div');
+      item.className = `select-item ${m.value === selectedModelVal ? 'active' : ''}`;
+      item.innerHTML = `${providerIcons[provider]} ${m.label}`;
+      item.addEventListener('click', () => {
+        modelSelect.value = m.value;
+        providerSelect.value = provider;
+        chrome.storage.sync.set({ provider: provider, model: m.value });
+        modelDropdown.classList.remove('open');
+        updateActiveDisplay(provider, m.label);
+        updateModels(); // Re-render to update active class
+      });
+      modelMenu.appendChild(item);
+    });
+  }
+}
+
+function updateActiveDisplay(provider, label) {
+  activeModelIcon.innerHTML = providerIcons[provider] || '';
+  activeModelName.textContent = label;
 }
 
 init();
