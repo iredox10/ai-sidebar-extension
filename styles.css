@@ -760,6 +760,56 @@ input, textarea, select { font-family: var(--font-sans); outline: none; }
   to { transform: rotate(360deg); }
 }
 
+/* ── Vim Mode Indicator ── */
+.vim-indicator {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 2px 8px; border-radius: 4px;
+  margin-left: 4px; line-height: 20px;
+  flex-shrink: 0;
+}
+.vim-indicator.normal {
+  color: #22c55e; background: rgba(34,197,94,0.1);
+}
+.vim-indicator.insert {
+  color: #60a5fa; background: rgba(96,165,250,0.1);
+}
+
+/* ── Vim Help Overlay ── */
+.vim-help-overlay {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+}
+.vim-help-panel {
+  background: var(--bg-secondary); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  width: 320px; max-height: 80vh; overflow-y: auto;
+}
+.vim-help-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid var(--border-subtle);
+}
+.vim-help-header h3 { font-size: 15px; font-weight: 600; }
+.vim-help-body { padding: 12px 20px 20px; }
+.vim-help-section { margin-top: 16px; }
+.vim-help-section:first-child { margin-top: 0; }
+.vim-help-section-title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: 8px;
+}
+.vim-help-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 5px 0; font-size: 13px; color: var(--text-secondary);
+}
+.vim-help-row kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 22px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: 4px; padding: 0 6px; color: var(--text-primary);
+}
+.vim-help-row span { color: var(--text-secondary); }
+
 /* Syntax Highlighting Tokens (Vercel/OneDark inspired) */
 .hl-c { color: #6e7681; font-style: italic; } /* comments */
 .hl-s { color: #a5d6ff; } /* strings */

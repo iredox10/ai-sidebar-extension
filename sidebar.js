@@ -1552,6 +1552,87 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('scroll', hideSelToolbar, true);
 
+// ---- Vim Mode ----
+
+let vimMode = 'normal';
+let vimPartial = '';
+let vimPartialTimer = null;
+
+const vimIndicator = document.getElementById('vimIndicator');
+const vimHelpOverlay = document.getElementById('vimHelpOverlay');
+
+function setVimMode(mode) {
+  vimMode = mode;
+  vimIndicator.textContent = mode === 'normal' ? 'NORMAL' : 'INSERT';
+  vimIndicator.className = `vim-indicator ${mode}`;
+}
+
+function vimScrollChat(amount) {
+  if (amount === 'top') { chatArea.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  if (amount === 'bottom') { chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' }); return; }
+  chatArea.scrollBy({ top: amount, behavior: 'smooth' });
+}
+
+function toggleVimHelp() {
+  const isOpen = vimHelpOverlay.style.display !== 'none';
+  vimHelpOverlay.style.display = isOpen ? 'none' : 'flex';
+}
+
+document.addEventListener('keydown', (e) => {
+  const tag = e.target.tagName;
+  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable;
+
+  if (isInput && e.key === 'Escape') {
+    e.target.blur();
+    setVimMode('normal');
+    e.preventDefault();
+    return;
+  }
+
+  if (isInput) return;
+  if (vimMode !== 'normal') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  const key = e.key;
+
+  if (vimPartial === 'g') {
+    clearTimeout(vimPartialTimer);
+    vimPartial = '';
+    if (key === 'g') { vimScrollChat('top'); e.preventDefault(); return; }
+    const cmd = vimBindings[key];
+    if (cmd) { cmd(); e.preventDefault(); }
+    return;
+  }
+
+  const cmd = vimBindings[key];
+  if (cmd) { cmd(); e.preventDefault(); return; }
+
+  if (key === 'g') {
+    vimPartial = 'g';
+    vimPartialTimer = setTimeout(() => { vimPartial = ''; }, 500);
+    e.preventDefault();
+  }
+});
+
+const vimBindings = {
+  j() { vimScrollChat(50); },
+  k() { vimScrollChat(-50); },
+  d() { vimScrollChat(chatArea.clientHeight * 0.5); },
+  u() { vimScrollChat(-(chatArea.clientHeight * 0.5)); },
+  G() { vimScrollChat('bottom'); },
+  i() { setVimMode('insert'); messageInput.focus(); },
+  H() { toggleHistory(); },
+  '?': toggleVimHelp,
+};
+
+document.getElementById('vimHelpClose').addEventListener('click', () => {
+  vimHelpOverlay.style.display = 'none';
+});
+
+vimHelpOverlay.addEventListener('click', (e) => {
+  if (e.target === vimHelpOverlay) vimHelpOverlay.style.display = 'none';
+});
+
 init();
 
 let ticking = false;
